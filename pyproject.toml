@@ -1,10 +1,11 @@
 [project]
 name = "uav-operator"
-description = "Your environment description here"
-tags = ["placeholder-tag", "train", "eval"]
+description = "A multi-turn UAV operations environment where models manage drone missions under wind, airspace, and failure events."
+tags = ["uav", "drone-operations", "multi-turn", "tool-use", "train", "eval"]
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy",
     "verifiers>=0.1.15.dev189",
 ]
 
@@ -13,7 +14,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-include = ["uav_operator.py", "pyproject.toml"] 
+include = ["uav_operator.py", "pyproject.toml"]
 
 [tool.verifiers.eval]
 num_examples = 5
