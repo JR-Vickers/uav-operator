@@ -51,3 +51,17 @@ Current defense:
 
 Open TODO:
 - Add T2 composed scenarios where conservative abort loses to a safe replan.
+
+## Day 5: repeated geofence and override loops
+
+Exploit idea:
+- Re-file the same known-conflicting route or spam overrides after a failsafe
+  clears, hoping the simulator's deduplicated procedure log makes retries free.
+
+Current defense:
+- Each known-conflict filing is preserved as a separate simulator procedure
+  violation; reward never reads the model's explanation.
+- Invalid or inactive-failsafe override attempts also create procedure
+  violations, in addition to their simulated-time cost.
+- Regression tests verify that repeating the loop strictly worsens procedure
+  reward and does not crash the environment.

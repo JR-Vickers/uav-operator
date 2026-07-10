@@ -17,19 +17,19 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 4 implemented: seeded T0-T1 generator, event interrupts for
-  wind shift / pop-up TFR / battery degrade / site closure, full SPEC §5 reward
-  v0, rulebook and reckless baselines, deterministic sim logging, and the full
-  SPEC §3.2 console. T2/T3 generation and renderer remain next.
+- **Status**: Day 5 implemented: seeded T0-T3 generation, composed-event
+  feasibility checks, a 300/60/60 train/dev/final-eval split, loop-regression
+  pricing, scripted calibration, deterministic sim logging, and the full SPEC
+  §3.2 console. Live frontier calibration and renderer remain next.
 
 ### Datasets
-- **Primary dataset(s)**: Seeded scenario generator emitting T0-T1 examples.
+- **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
 - **Source links**: Static Day 2 world data is generated in-repo with
   `scripts/build_world.py` from simplified public-structure airspace and
   synthetic obstacle assumptions.
-- **Current split sizes**: default Day 4 eval set is 20 mixed T0-T1 examples.
-  v0.1 target remains at least 300 train and 60 eval scenarios, stratified
-  across T0-T3 difficulty tiers.
+- **Current split sizes**: 300 train, 60 dev/calibration, and 60 final eval
+  rows. Each split is stratified evenly across T0-T3; final-eval seeds are
+  never used for dial calibration.
 
 ### Task
 - **Type**: Multi-turn tool use.
@@ -73,14 +73,22 @@ Notes:
 - Inspect the deterministic scripted rollout artifact at
   `assets/rollouts/day3_scripted_rollout.json`.
 - Run local baselines with
-  `uv run python scripts/baselines.py --policy both --episodes 20`.
+  `uv run python scripts/baselines.py --policy both --episodes 20 --tier all`.
+- Run Day 5 scripted calibration with
+  `uv run python scripts/day5_calibration.py`, then plot it with
+  `uv run --with matplotlib python scripts/plot_day5_scores.py outputs/day5/scripted_calibration.json`.
+- Run each final frontier tier with fixed sampling, for example:
+  `prime --plain eval run uav-operator -m poolside/laguna-m.1 -n 15 -r 2 -t 512 -T 0.2 --save-results --state-columns sim_state,sim_log`.
+  Repeat for `gpt-4.1` and record the printed run ID/results path; use taskset
+  tier overrides for `T0` through `T3`.
 
 ### Taskset Config
 Planned fields:
 
 | Field | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
-| `tier` | string | `mixed_day4` | Scenario tier selection: `T0`, `T1`, or mixed Day 4 T0/T1. |
+| `tier` | string | `mixed_day5` | Scenario tier: `T0`–`T3`, `mixed_day5`, or legacy `mixed_day4`. |
+| `dataset_split` | string | internal | Generated split: 300 train rows, 60 dev rows for scripts, or 60 held eval rows. |
 | `seed` | int | `0` | Base seed for deterministic scenario generation. |
 | `max_examples` | int | `-1` | Limit on dataset size; use `-1` for all generated examples. |
 | `wind_enabled` | bool | `true` | Enable seeded Day 3 wind field and altitude shear. |

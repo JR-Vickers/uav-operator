@@ -183,8 +183,11 @@ tightness, deadline pressure, brief ambiguity)
   dispatcher-level tools. Do not touch before Day 10 gate.
 
 Dataset: generator emits `{seed, tier, scenario_config, briefing_text}` rows;
-v0.1 ships ≥300 train / ≥60 eval, stratified by tier. Eval seeds withheld from
-any tuning decisions.
+v0.1 ships 300 train, 60 dev/calibration, and 60 final-eval rows, stratified
+evenly by tier. Dev rows tune generator dials; final-eval seeds are withheld
+from all tuning decisions. T2/T3 generator admission uses an analytic,
+deterministic feasibility check: at least one route/recovery candidate must
+complete and land above the briefed reserve without a hard-safety violation.
 
 ## 7. Rendering (dev-only pipeline, `renderer/`)
 

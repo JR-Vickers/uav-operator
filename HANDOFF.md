@@ -1,5 +1,34 @@
 # HANDOFF.md
 
+## 2026-07-10 Day 5 T2/T3 generation + calibration
+
+Changed:
+- Replaced the alternating Day 4 dataset with generated T0-T3 scenarios and
+  composed T2/T3 event sets drawn only from the active Day 4 taxonomy.
+- Added a deterministic analytic feasibility check for route/recovery candidates
+  and a conservative TFR-to-wind fallback that preserves composed-event count.
+- Added non-overlapping, stratified 300 train / 60 dev / 60 final-eval splits;
+  `load_environment()` now uses train rows for training and held eval rows for
+  evaluation.
+- Added repeat pricing for known-geofence filings and invalid/inactive failsafe
+  overrides, with regression tests.
+- Added `scripts/day5_calibration.py` and `scripts/plot_day5_scores.py`; baseline
+  CLI now supports `--tier all`.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run --with pytest pytest -q` passes: 18 tests.
+- `uv run python scripts/day5_calibration.py --episodes 2 --output /tmp/day5_calibration.json` passes.
+
+Broken / not done:
+- The Day 4 live-frontier postmortem and Day 5 final live calibration with
+  `poolside/laguna-m.1` and `gpt-4.1` have not been run in this session.
+- No final frontier plot is committed until those saved evaluation results exist.
+
+Next action:
+- Run the two-model, two-rollout-per-scenario final evaluation across T0-T3,
+  inspect the T1 postmortem, and calibrate only against the 60-row dev split.
+
 ## 2026-07-10 Day 4 reward v0 + first contact
 
 Changed:

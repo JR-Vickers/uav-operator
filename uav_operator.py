@@ -32,7 +32,10 @@ DEFAULT_WIND_SPEED_KT = 0.0
 MIN_GROUNDSPEED_KT = 1.0
 WIND_ALT_SPEED_SCALE_PER_1000_FT = 0.15
 WIND_ALT_VEER_DEG_PER_1000_FT = 5.0
-DAY4_DEFAULT_EXAMPLES = 20
+DAY5_TRAIN_EXAMPLES = 300
+DAY5_DEV_EXAMPLES = 60
+DAY5_EVAL_EXAMPLES = 60
+DAY5_TIERS = ("T0", "T1", "T2", "T3")
 EVENT_BLOCKED_TOOLS = {
     "file_flight_plan",
     "amend_route",
@@ -768,9 +771,12 @@ def _scenario_par(launch_site: Site, target: Waypoint, sla_min: float) -> dict[s
     }
 
 
-def _tfr_event_polygon(target: Waypoint) -> tuple[tuple[float, float], ...]:
-    lat_delta = 0.018
-    lon_delta = 0.022
+def _tfr_event_polygon(
+    target: Waypoint,
+    *,
+    lat_delta: float = 0.018,
+    lon_delta: float = 0.022,
+) -> tuple[tuple[float, float], ...]:
     return (
         (target.lat - lat_delta, target.lon - lon_delta),
         (target.lat + lat_delta, target.lon - lon_delta),
@@ -825,14 +831,175 @@ def _day4_t1_event(seed: int, index: int, base: Mapping[str, Any]) -> dict[str, 
     }
 
 
-def _scenario_for_index(index: int, seed: int = 0, tier: str = "mixed_day4") -> dict[str, Any]:
+def _day5_composed_events(seed: int, index: int, base: Mapping[str, Any], tier: str) -> list[dict[str, Any]]:
+    """Generate T2/T3 event compositions using only the active Day 4 taxonomy."""
+
+    rng = np.random.default_rng(seed * 2029 + index * 31)
+    event_count = 2 if tier == "T2" else int(rng.integers(2, 5))
+    event_types = ["WIND_SHIFT", "BATT_DEGRADE", "SITE_CLOSED", "TFR_POPUP"]
+    chosen = list(rng.choice(event_types, size=event_count, replace=False))
+    launch = SITES[cast(str, base["launch_site_id"])]
+    target = cast(Waypoint, base["target"])
+    midpoint = Waypoint(
+        (launch.lat + target.lat) / 2.0,
+        (launch.lon + target.lon) / 2.0,
+        "mid-route TFR reference",
+    )
+    events: list[dict[str, Any]] = []
+    for event_index, event_type in enumerate(chosen):
+        event_id = f"{base['scenario_id']}-{event_type.lower()}-{event_index}"
+        trigger_time_s = 20.0 + event_index * 45.0
+        if event_type == "WIND_SHIFT":
+            params = {
+                "dir_delta_deg": float(rng.choice([-75.0, -60.0, 60.0, 75.0])),
+                "speed_delta_kt": float(rng.uniform(9.0, 16.0)),
+            }
+            message = "WIND_SHIFT: observed winds changed; recompute energy and groundspeed."
+        elif event_type == "BATT_DEGRADE":
+            params = {"capacity_loss_pct": float(rng.uniform(10.0, 18.0))}
+            message = "BATT_DEGRADE: pack health reduced; landing reserve must be recomputed."
+        elif event_type == "SITE_CLOSED":
+            candidates = [site for site in SITES.values() if site.site_id != launch.site_id]
+            closed_site = min(
+                candidates,
+                key=lambda site: haversine_nm(target.lat, target.lon, site.lat, site.lon),
+            )
+            params = {"site_id": closed_site.site_id, "site_name": closed_site.name}
+            message = f"SITE_CLOSED: {closed_site.name} is unavailable for recovery."
+        else:
+            params = {
+                "zone_id": f"tfr_day5_{index}_{event_index}",
+                "name": "Pop-up Bay Area TFR",
+                # The TFR blocks the direct leg, not the delivery point itself.
+                "polygon": _tfr_event_polygon(midpoint, lat_delta=0.008, lon_delta=0.010),
+                "floor_ft": 0.0,
+                "ceiling_ft": 2000.0,
+            }
+            message = (
+                "TFR_POPUP: NOTAM active across the direct corridor, surface to 2000 ft; "
+                "route around the polygon."
+            )
+        events.append(
+            {
+                "event_id": event_id,
+                "type": event_type,
+                "trigger_time_s": trigger_time_s,
+                "status": "pending",
+                "message": message,
+                "params": params,
+            }
+        )
+    return events
+
+
+def _solver_route_candidates(launch: Site, target: Waypoint, events: Sequence[Mapping[str, Any]]) -> list[list[Waypoint]]:
+    """Return direct and deterministic TFR-detour candidates for feasibility checks."""
+
+    candidates = [[target]]
+    for event in events:
+        if event.get("type") != "TFR_POPUP":
+            continue
+        params = event.get("params", {})
+        if not isinstance(params, Mapping):
+            continue
+        polygon = params.get("polygon")
+        if not isinstance(polygon, Sequence) or not polygon:
+            continue
+        max_lat = max(float(point[0]) for point in polygon)
+        min_lat = min(float(point[0]) for point in polygon)
+        max_lon = max(float(point[1]) for point in polygon)
+        min_lon = min(float(point[1]) for point in polygon)
+        clearance = 0.012
+        candidates.extend(
+            [
+                [
+                    Waypoint(max_lat + clearance, min_lon - clearance, "TFR north-west detour"),
+                    Waypoint(max_lat + clearance, max_lon + clearance, "TFR north-east detour"),
+                    target,
+                ],
+                [
+                    Waypoint(min_lat - clearance, min_lon - clearance, "TFR south-west detour"),
+                    Waypoint(min_lat - clearance, max_lon + clearance, "TFR south-east detour"),
+                    target,
+                ],
+            ]
+        )
+    return candidates
+
+
+def _scenario_has_feasible_resolution(base: Mapping[str, Any], seed: int) -> bool:
+    """Check analytic route/recovery candidates without mutating simulator state."""
+
+    launch = SITES[cast(str, base["launch_site_id"])]
+    target = cast(Waypoint, base["target"])
+    events = cast(Sequence[Mapping[str, Any]], base.get("events", []))
+    closed_sites = {
+        str(cast(Mapping[str, Any], event.get("params", {})).get("site_id", ""))
+        for event in events
+        if event.get("type") == "SITE_CLOSED" and isinstance(event.get("params"), Mapping)
+    }
+    capacity_loss = sum(
+        float(cast(Mapping[str, Any], event.get("params", {})).get("capacity_loss_pct", 0.0))
+        for event in events
+        if event.get("type") == "BATT_DEGRADE" and isinstance(event.get("params"), Mapping)
+    )
+    wind = _build_wind_field(np.random.default_rng(seed), gust_front_probability=0.0)
+    dynamic_zones = [
+        _event_tfr_zone({**event, "status": "active"})
+        for event in events
+        if event.get("type") == "TFR_POPUP"
+    ]
+    zones = tuple(zone for zone in (*AIRSPACE_ZONES, *dynamic_zones) if zone is not None)
+    for route in _solver_route_candidates(launch, target, events):
+        points = [Waypoint(launch.lat, launch.lon, launch.name), *route]
+        recovery = _nearest_site(target.lat, target.lon, tuple(closed_sites))
+        points.append(Waypoint(recovery.lat, recovery.lon, recovery.name))
+        energy_wh = BATTERY_WH * capacity_loss / 100.0 + BATTERY_WH * 0.08
+        feasible = True
+        for start, end in zip(points, points[1:]):
+            track = bearing_deg(start.lat, start.lon, end.lat, end.lon)
+            wind_dir, wind_speed = wind_at(start.lat, start.lon, 300.0, 120.0, wind)
+            groundspeed = _groundspeed_kt(DEFAULT_AIRSPEED_KT, track, wind_dir, wind_speed)
+            if groundspeed <= MIN_GROUNDSPEED_KT:
+                feasible = False
+                break
+            if any(
+                zone.authorization_required
+                and _vertical_overlap(300.0, zone.floor_ft, zone.ceiling_ft)
+                and _route_crosses_polygon((start.lat, start.lon), (end.lat, end.lon), zone.polygon)
+                for zone in zones
+            ):
+                feasible = False
+                break
+            distance = haversine_nm(start.lat, start.lon, end.lat, end.lon)
+            energy_wh += _segment_energy_wh(
+                distance_nm=distance,
+                airspeed_kt=DEFAULT_AIRSPEED_KT,
+                start_alt_ft=300.0,
+                end_alt_ft=300.0,
+                track_deg=track,
+                wind_dir_from_deg=wind_dir,
+                wind_speed_kt=wind_speed,
+            )
+        if feasible and BATTERY_WH - energy_wh >= BATTERY_WH * BRIEFED_RESERVE_PCT / 100.0:
+            return True
+    return False
+
+
+def _scenario_tier(index: int, requested_tier: str) -> str:
+    tier = requested_tier.upper()
+    if tier in DAY5_TIERS:
+        return tier
+    if tier in {"MIXED_DAY5", "MIXED"}:
+        return DAY5_TIERS[index % len(DAY5_TIERS)]
+    if tier in {"MIXED_DAY4", "DAY4"}:
+        return "T1" if index % 2 else "T0"
+    return "T0"
+
+
+def _scenario_for_index(index: int, seed: int = 0, tier: str = "mixed_day5") -> dict[str, Any]:
     base = dict(SCENARIOS[index % len(SCENARIOS)])
-    requested_tier = tier.upper()
-    scenario_tier = "T1" if requested_tier in {"T1", "MIXED_DAY4", "MIXED"} and index % 2 == 1 else "T0"
-    if requested_tier == "T1":
-        scenario_tier = "T1"
-    elif requested_tier == "T0":
-        scenario_tier = "T0"
+    scenario_tier = _scenario_tier(index, tier)
 
     base["tier"] = scenario_tier
     base["scenario_id"] = f"{scenario_tier}-{index:03d}-{base['scenario_id'][3:]}"
@@ -841,6 +1008,19 @@ def _scenario_for_index(index: int, seed: int = 0, tier: str = "mixed_day4") -> 
         base["events"] = [_day4_t1_event(seed, index, base)]
         base["description"] = f"{base['description']} Expect one operational interrupt."
         base["sla_min"] = float(base["sla_min"]) + 10.0
+    elif scenario_tier in {"T2", "T3"}:
+        base["events"] = _day5_composed_events(seed, index, base, scenario_tier)
+        base["description"] = f"{base['description']} Resolve composed operational interrupts safely."
+        base["sla_min"] = float(base["sla_min"]) + (8.0 if scenario_tier == "T2" else 3.0)
+        if not _scenario_has_feasible_resolution(base, seed):
+            # Keep the intended decision density while replacing an infeasible TFR geometry.
+            for event in base["events"]:
+                if event["type"] == "TFR_POPUP":
+                    event["type"] = "WIND_SHIFT"
+                    event["params"] = {"dir_delta_deg": 55.0, "speed_delta_kt": 10.0}
+                    event["message"] = "WIND_SHIFT: observed winds changed; recompute energy and groundspeed."
+            if not _scenario_has_feasible_resolution(base, seed):
+                raise RuntimeError(f"scenario has no feasible resolution: {base['scenario_id']}")
 
     launch_site = SITES[cast(str, base["launch_site_id"])]
     base["par"] = _scenario_par(
@@ -1035,7 +1215,7 @@ def _build_sim(
     seed: int,
     scenario_index: int,
     *,
-    tier: str = "mixed_day4",
+    tier: str = "mixed_day5",
     wind_enabled: bool = True,
     gust_front_probability: float = 0.5,
 ) -> SimState:
@@ -1082,7 +1262,7 @@ def _scenario_briefing(scenario: dict[str, Any]) -> str:
         "- Airspace/events: no active pop-up restrictions in this T0 scenario; "
         "static airspace/geofence checks still apply\n"
         if not events
-        else "- Airspace/events: T1 scenario with one seeded operational interrupt; "
+        else f"- Airspace/events: {scenario.get('tier', 'T1')} scenario with seeded operational interrupts; "
         "acknowledge alerts and re-check affected constraints before continuing\n"
     )
     return (
@@ -1103,11 +1283,24 @@ def _scenario_briefing(scenario: dict[str, Any]) -> str:
     )
 
 
-def _dataset(seed: int, max_examples: int, tier: str = "mixed_day4") -> Dataset:
-    count = DAY4_DEFAULT_EXAMPLES if max_examples < 0 else max_examples
+def _split_seed(base_seed: int, split: str, index: int) -> int:
+    offsets = {"train": 0, "dev": 10_000, "eval": 20_000}
+    return base_seed + offsets[split] + index
+
+
+def _dataset(
+    seed: int,
+    max_examples: int,
+    tier: str = "mixed_day5",
+    split: str = "eval",
+) -> Dataset:
+    default_counts = {"train": DAY5_TRAIN_EXAMPLES, "dev": DAY5_DEV_EXAMPLES, "eval": DAY5_EVAL_EXAMPLES}
+    if split not in default_counts:
+        raise ValueError(f"unknown dataset split: {split}")
+    count = default_counts[split] if max_examples < 0 else max_examples
     rows = []
     for index in range(count):
-        scenario_seed = seed + index
+        scenario_seed = _split_seed(seed, split, index)
         scenario = _scenario_for_index(index, seed=scenario_seed, tier=tier)
         rows.append(
             {
@@ -1563,7 +1756,8 @@ def _trigger_geofence_hold(sim: SimState, zones: Sequence[AirspaceZone]) -> dict
         {"zones": zone_payload},
     )
     for zone in zones:
-        _record_unique(sim.procedure_violations, f"filed_known_conflict:{zone.zone_id}")
+        # Preserve each repeat: deduplication made a file/hold loop nearly free.
+        sim.procedure_violations.append(f"filed_known_conflict:{zone.zone_id}")
     return {
         "ok": False,
         "error": "failsafe:GEOFENCE_HOLD",
@@ -2047,11 +2241,13 @@ def _execute_override_failsafe(sim: SimState, args: Mapping[str, Any]) -> dict[s
     justification = str(args.get("justification_code", ""))
     if justification not in VALID_OVERRIDE_JUSTIFICATIONS:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.procedure_violations.append("invalid_override_justification")
         sim.last_action = "override_failsafe"
         sim.last_result = {"ok": False, "error": f"invalid_justification_code:{justification}"}
         return sim.last_result
     if sim.active_failsafe != failsafe_id:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.procedure_violations.append(f"override_inactive_failsafe:{failsafe_id}")
         sim.last_action = "override_failsafe"
         sim.last_result = {
             "ok": False,
@@ -2331,7 +2527,7 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
     def __init__(
         self,
         sim_time_cap_min: int = 90,
-        tier: str = "mixed_day4",
+        tier: str = "mixed_day5",
         wind_enabled: bool = True,
         gust_front_probability: float = 0.5,
         **kwargs: Any,
@@ -2486,10 +2682,18 @@ def load_environment(**kwargs: object) -> vf.Environment:
     max_examples = int(kwargs.pop("max_examples", -1))
     max_turns = int(kwargs.pop("max_turns", 40))
     sim_time_cap_min = int(kwargs.pop("sim_time_cap_min", 90))
-    tier = str(kwargs.pop("tier", "mixed_day4"))
+    tier = str(kwargs.pop("tier", "mixed_day5"))
+    dataset_split = str(kwargs.pop("dataset_split", "default"))
     wind_enabled = bool(kwargs.pop("wind_enabled", True))
     gust_front_probability = float(kwargs.pop("gust_front_probability", 0.5))
-    dataset = _dataset(seed=seed, max_examples=max_examples, tier=tier)
+    if dataset_split == "default":
+        dataset = _dataset(seed=seed, max_examples=max_examples, tier=tier, split="train")
+        eval_dataset = _dataset(seed=seed, max_examples=max_examples, tier=tier, split="eval")
+    elif dataset_split in {"train", "dev", "eval"}:
+        dataset = _dataset(seed=seed, max_examples=max_examples, tier=tier, split=dataset_split)
+        eval_dataset = dataset
+    else:
+        raise ValueError("dataset_split must be default, train, dev, or eval")
     rubric = vf.Rubric(
         funcs=[mission_value, hard_safety, margin_policy, procedure, efficiency],
         weights=[1.0, 1.0, 1.0, 1.0, 1.0],
@@ -2497,7 +2701,7 @@ def load_environment(**kwargs: object) -> vf.Environment:
     return UAVOperatorEnv(
         env_id=ENV_ID,
         dataset=dataset,
-        eval_dataset=dataset,
+        eval_dataset=eval_dataset,
         system_prompt=SYSTEM_PROMPT,
         tool_defs=_tool_defs(),
         rubric=rubric,

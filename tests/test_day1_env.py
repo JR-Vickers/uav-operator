@@ -45,7 +45,8 @@ def test_load_environment_exposes_day1_dataset_and_tools() -> None:
     env = uav_operator.load_environment()
 
     assert env.env_id == uav_operator.ENV_ID
-    assert len(env.get_eval_dataset()) == uav_operator.DAY4_DEFAULT_EXAMPLES
+    assert len(env.dataset) == uav_operator.DAY5_TRAIN_EXAMPLES
+    assert len(env.get_eval_dataset()) == uav_operator.DAY5_EVAL_EXAMPLES
     assert [tool.name for tool in env.tool_defs or []] == [
         "get_telemetry",
         "get_weather",
@@ -364,6 +365,53 @@ def test_day4_dataset_emits_deterministic_t0_t1_mix() -> None:
 
     assert [row["info"]["tier"] for row in rows] == ["T0", "T1", "T0", "T1", "T0", "T1"]
     assert rows == list(uav_operator.load_environment(seed=100, max_examples=6, tier="mixed_day4").get_eval_dataset())
+
+
+def test_day5_splits_are_stratified_disjoint_and_deterministic() -> None:
+    train = list(uav_operator._dataset(7, -1, tier="mixed_day5", split="train"))
+    dev = list(uav_operator._dataset(7, -1, tier="mixed_day5", split="dev"))
+    evaluation = list(uav_operator._dataset(7, -1, tier="mixed_day5", split="eval"))
+
+    assert len(train) == 300
+    assert len(dev) == len(evaluation) == 60
+    assert {row["info"]["seed"] for row in train}.isdisjoint(row["info"]["seed"] for row in dev)
+    assert {row["info"]["seed"] for row in dev}.isdisjoint(row["info"]["seed"] for row in evaluation)
+    for rows, expected in ((train, 75), (dev, 15), (evaluation, 15)):
+        assert {tier: sum(row["info"]["tier"] == tier for row in rows) for tier in uav_operator.DAY5_TIERS} == {
+            tier: expected for tier in uav_operator.DAY5_TIERS
+        }
+    assert evaluation == list(uav_operator._dataset(7, -1, tier="mixed_day5", split="eval"))
+    assert len(uav_operator.load_environment(dataset_split="dev").get_eval_dataset()) == 60
+
+
+def test_day5_composed_scenarios_are_solver_checked() -> None:
+    for tier in ("T2", "T3"):
+        for index in range(12):
+            scenario = uav_operator._scenario_for_index(index, seed=200 + index, tier=tier)
+            assert 2 <= len(scenario["events"]) <= (2 if tier == "T2" else 4)
+            assert uav_operator._scenario_has_feasible_resolution(scenario, 200 + index)
+
+
+def test_repeated_known_geofence_filing_and_invalid_override_cost_procedure() -> None:
+    env, state = _setup_state(seed=9, scenario_index=3)
+    conflicting_plan = {
+        "waypoints": [{"lat": 37.62, "lon": -122.39, "name": "SFO core test"}],
+        "alt_ft": 250,
+        "airspeed_kt": 35,
+        "lost_link_plan": "return_home",
+    }
+    _run_tool(env, state, "file_flight_plan", conflicting_plan)
+    first_penalty = uav_operator.procedure(state)
+    _run_tool(env, state, "file_flight_plan", conflicting_plan)
+    _run_tool(
+        env,
+        state,
+        "override_failsafe",
+        {"id": "LOW_BATT_RTL", "justification_code": "MISSION_CRITICAL_MARGIN_OK"},
+    )
+
+    assert uav_operator.procedure(state) < first_penalty
+    assert any(item.startswith("override_inactive_failsafe") for item in state["sim_state"]["procedure_violations"])
 
 
 def test_day4_t1_event_interrupt_is_logged_and_acknowledged() -> None:

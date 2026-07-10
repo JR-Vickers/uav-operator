@@ -1,4 +1,4 @@
-"""Day 4 scripted baselines for uav-operator."""
+"""Scripted baselines for uav-operator curriculum calibration."""
 
 from __future__ import annotations
 
@@ -218,17 +218,20 @@ def main() -> None:
     parser.add_argument("--policy", choices=["rulebook", "reckless", "both"], default="both")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--episodes", type=int, default=20)
-    parser.add_argument("--tier", default="mixed_day4")
+    parser.add_argument("--tier", default="mixed_day5")
     args = parser.parse_args()
 
     policies: list[Policy] = ["rulebook", "reckless"] if args.policy == "both" else [args.policy]
     output: dict[str, Any] = {}
+    tiers = ["T0", "T1", "T2", "T3"] if args.tier == "all" else [args.tier]
     for policy in policies:
-        rows = asyncio.run(run_many(policy, seed=args.seed, episodes=args.episodes, tier=args.tier))
-        output[policy] = {
-            "summary": _summarize(rows),
-            "episodes": rows,
-        }
+        output[policy] = {}
+        for tier in tiers:
+            rows = asyncio.run(run_many(policy, seed=args.seed, episodes=args.episodes, tier=tier))
+            output[policy][tier] = {
+                "summary": _summarize(rows),
+                "episodes": rows,
+            }
     print(json.dumps(output, indent=2, sort_keys=True))
 
 
