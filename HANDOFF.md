@@ -18,6 +18,10 @@ Changed:
   `efficiency`, all computed from saved `sim_log` snapshots.
 - Added `scripts/baselines.py` with rulebook and reckless policies that drive
   the environment through the same tool-call path as model rollouts.
+- Moved the local `vf-eval` summary tweak into the repo as
+  `patches/verifiers_eval_utils_run_results.patch` plus
+  `scripts/apply_vf_eval_summary_patch.py` so the run-id / results-path footer
+  can be re-applied after a fresh install.
 - Added Day 4 tests for deterministic T0/T1 dataset generation, event
   interrupt logging, prose-inert reward behavior, and rulebook > reckless.
 - Updated README, SPEC reward notes, and `docs/HACKS.md`.

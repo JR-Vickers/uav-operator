@@ -1,0 +1,31 @@
+diff --git a/.venv/lib/python3.12/site-packages/verifiers/utils/eval_utils.py b/.venv/lib/python3.12/site-packages/verifiers/utils/eval_utils.py
+index 0000000..0000000 100644
+--- a/.venv/lib/python3.12/site-packages/verifiers/utils/eval_utils.py
++++ b/.venv/lib/python3.12/site-packages/verifiers/utils/eval_utils.py
+@@ -1055,6 +1055,8 @@ async def run_evaluation(
+             max_retries=config.max_retries,
+             on_start=on_start,
+             on_progress=on_progress,
+             on_log=on_log,
+         )
++        outputs["metadata"]["results_path"] = str(results_path)
++        outputs["metadata"]["run_id"] = results_path.name
+     finally:
+         if not config.disable_env_server:
+             await vf_env.stop_server()
+@@ -1184,6 +1186,12 @@ async def run_evaluations(config: EvalRunConfig) -> None:
+         max_lag = float(lags_arr.max())
+         print(
+             f"\nPerformance:\nevent_loop_lag: mean={print_time(mean_lag)}, p99={print_time(p99_lag)}, max={print_time(max_lag)} (n={n})"
+         )
++    print("\nRun Results:")
++    for results in all_results:
++        metadata = results.get("metadata") or {}
++        run_id = metadata.get("run_id")
++        results_path = metadata.get("results_path")
++        if run_id and results_path:
++            print(f"run_id: {run_id}")
++            print(f"results_path: {results_path}")
+ 
+ 
+ async def run_evaluations_tui(

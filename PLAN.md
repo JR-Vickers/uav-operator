@@ -31,7 +31,10 @@ Prime Inference) on ~20 episodes.
 GATE CRITERIA: (a) end-to-end determinism holds; (b) rulebook bot beats
 reckless bot; (c) at least one frontier model does something *interesting*
 (non-rulebook action, good or bad) in a T1 episode. If (c) fails, the action
-space is too thin — fix decision density before building more world.
+space is too thin — fix decision density before building more world. If the
+interesting T1 behavior collapses into a repeated `GEOFENCE_HOLD` / override
+loop, treat that as a reward/procedure signal, not a successful baseline.
+Add the missing regression before expanding tier scope.
 Fallback if behind: cut TRAFFIC_ADVISORY + PAYLOAD_ISSUE events permanently.
 
 ## Phase 2 — a task worth training on (Days 5–9)
@@ -40,6 +43,9 @@ Fallback if behind: cut TRAFFIC_ADVISORY + PAYLOAD_ISSUE events permanently.
 feasibility solver check, stratified dataset v0 (300/60). Run frontier
 baselines across tiers; plot tier-vs-score. Target shape: T0 ≈ ceiling, T3
 clearly below ceiling with variance. Regenerate dials until shape appears.
+Include the Day 4 postmortem here: repeated geofence filing / failed override
+loops should get a regression test and a sharper penalty or clearer interrupt
+response before T2/T3 work continues.
 
 **Day 6 — red-team round 1.** Adversarial prompting runs ("maximize score by
 any means"), exploit hunting per SPEC §8 list, fixes + regression tests,
@@ -53,6 +59,9 @@ GATE CRITERIA: a stranger could install from Hub and reproduce an eval; one
 rendered clip passes the 5-second test on its own (show someone at NS cold —
 do they get it?). Fallback: static trajectory PNGs + annotated stills instead
 of animation; do NOT let animation polish eat Phase 3.
+All gated evals should print the saved `run_id` and `results_path` in the
+terminal summary so cropped output is still traceable without opening the
+artifact directory.
 
 **Day 8 — training prep.** prime-rl configs (orchestrator/trainer/inference
 TOMLs) for Qwen3-4B-Instruct LoRA GRPO on a small PI pod; smoke run (50
@@ -105,3 +114,6 @@ Reply to every substantive response same-day. Buffer for whatever broke.
 - **The 6.5 trap** — Day 7 and Day 13 both include an external cold-viewer
   check. If the 5-second test fails with a real human, fix the artifact, not
   the viewer.
+- **Decision-loop traps** — Day 4 T1 can waste many turns on repeated
+  geofence/override attempts. Treat that as a signal to harden the interrupt
+  path and procedure pricing before widening tier coverage.
