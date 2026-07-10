@@ -37,6 +37,13 @@ Next action:
   T0-T1 scenario generator, determinism check in CI shape, and first model
   contact through Prime Inference if credentials are available.
 
+Troubleshooting update:
+- Fixed `vf-eval --state-columns sim_state,sim_log` response serialization
+  failure by storing NumPy PCG `rng_state.state.state` and `rng_state.state.inc`
+  as decimal strings in persisted sim state/logs, then converting them back to
+  ints only when assigning to NumPy.
+- Added a msgpack regression test for saved `sim_state` / `sim_log` columns.
+
 ## 2026-07-10 Day 2 geography + energy
 
 Changed:

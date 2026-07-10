@@ -795,6 +795,30 @@ def _wind_field_from_mapping(value: Mapping[str, Any]) -> WindField:
     )
 
 
+def _pack_rng_state(rng_state: Mapping[str, Any]) -> dict[str, Any]:
+    """Make NumPy bit-generator state msgpack-safe for Verifiers transport."""
+
+    packed = dict(rng_state)
+    inner = packed.get("state")
+    if isinstance(inner, Mapping):
+        packed["state"] = {
+            key: str(value) if key in {"state", "inc"} else value
+            for key, value in inner.items()
+        }
+    return packed
+
+
+def _unpack_rng_state(rng_state: Mapping[str, Any]) -> dict[str, Any]:
+    unpacked = dict(rng_state)
+    inner = unpacked.get("state")
+    if isinstance(inner, Mapping):
+        unpacked["state"] = {
+            key: int(value) if key in {"state", "inc"} else value
+            for key, value in inner.items()
+        }
+    return unpacked
+
+
 def wind_at(
     lat: float,
     lon: float,
@@ -892,7 +916,7 @@ def _build_sim(
         mission=mission,
         home_site_id=launch_site.site_id,
         wind=wind,
-        rng_state=dict(rng.bit_generator.state),
+        rng_state=_pack_rng_state(cast(Mapping[str, Any], rng.bit_generator.state)),
     )
 
 
@@ -1018,9 +1042,9 @@ def _segment_energy_wh(
 
 def _execution_multiplier(sim: SimState) -> float:
     rng = np.random.default_rng()
-    rng.bit_generator.state = sim.rng_state
+    rng.bit_generator.state = _unpack_rng_state(sim.rng_state)
     multiplier = float(rng.normal(1.0, 0.03))
-    sim.rng_state = dict(rng.bit_generator.state)
+    sim.rng_state = _pack_rng_state(cast(Mapping[str, Any], rng.bit_generator.state))
     sim.rng_draws += 1
     return min(1.10, max(0.90, multiplier))
 
@@ -1839,7 +1863,12 @@ def _state_sim(state: vf.State) -> SimState:
         ),
         home_site_id=str(state["sim_state"]["home_site_id"]),
         wind=wind,
-        rng_state=dict(state["sim_state"].get("rng_state", np.random.default_rng(0).bit_generator.state)),
+        rng_state=_pack_rng_state(
+            cast(
+                Mapping[str, Any],
+                state["sim_state"].get("rng_state", np.random.default_rng(0).bit_generator.state),
+            )
+        ),
         current_plan=[
             Waypoint(**waypoint) for waypoint in state["sim_state"].get("current_plan", [])
         ],

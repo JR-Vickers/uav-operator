@@ -4,6 +4,7 @@ import asyncio
 import json
 from typing import Any
 
+import msgpack
 import verifiers as vf
 
 import uav_operator
@@ -294,6 +295,28 @@ def test_day3_override_and_acknowledge_clear_active_geofence_failsafe() -> None:
     assert json.loads(override[0].content)["ok"] is True
     assert state["sim_state"]["active_failsafe"] is None
     assert state["sim_state"]["overrides"][-1]["id"] == "GEOFENCE_HOLD"
+
+
+def test_day3_saved_state_columns_are_msgpack_serializable() -> None:
+    env, state = _setup_state(seed=15, scenario_index=0)
+    msgpack.packb(state["sim_state"])
+    msgpack.packb(state["sim_log"])
+
+    target = state["sim_state"]["mission"]["target"]
+    _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [target],
+            "alt_ft": 300,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+
+    msgpack.packb(state["sim_state"])
+    msgpack.packb(state["sim_log"])
 
 
 def test_same_seed_and_action_sequence_are_deterministic() -> None:
