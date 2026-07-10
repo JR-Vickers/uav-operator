@@ -26,11 +26,23 @@ HIGH_IMPACT_TOOL_LATENCY_S = 30.0
 INVALID_ACTION_LATENCY_S = 30.0
 LOW_BATT_RTL_THRESHOLD_PCT = 30.0
 LOW_BATT_RTL_THRESHOLD_WH = BATTERY_WH * LOW_BATT_RTL_THRESHOLD_PCT / 100.0
+BRIEFED_RESERVE_PCT = 20.0
 DEFAULT_WIND_DIR_FROM_DEG = 270.0
 DEFAULT_WIND_SPEED_KT = 0.0
 MIN_GROUNDSPEED_KT = 1.0
 WIND_ALT_SPEED_SCALE_PER_1000_FT = 0.15
 WIND_ALT_VEER_DEG_PER_1000_FT = 5.0
+DAY4_DEFAULT_EXAMPLES = 20
+EVENT_BLOCKED_TOOLS = {
+    "file_flight_plan",
+    "amend_route",
+    "set_altitude",
+    "set_speed",
+    "resume",
+    "land_now",
+    "release_payload",
+    "override_failsafe",
+}
 VALID_OVERRIDE_JUSTIFICATIONS = {
     "MISSION_CRITICAL_MARGIN_OK",
     "SAFE_LANDING_ASSURED",
@@ -157,12 +169,20 @@ class SimState:
 
     seed: int
     scenario_id: str
+    tier: str
     sim_time_s: float
     aircraft: Aircraft
     mission: Mission
     home_site_id: str
     wind: WindField
     rng_state: dict[str, Any]
+    scenario_par: dict[str, float]
+    events: list[dict[str, Any]] = field(default_factory=list)
+    active_events: list[str] = field(default_factory=list)
+    acknowledged_events: list[str] = field(default_factory=list)
+    closed_sites: list[str] = field(default_factory=list)
+    hard_safety_violations: list[str] = field(default_factory=list)
+    procedure_violations: list[str] = field(default_factory=list)
     current_plan: list[Waypoint] = field(default_factory=list)
     lost_link_plan: str = "return_home"
     rng_draws: int = 0
@@ -664,7 +684,38 @@ def _vertical_overlap(alt_ft: float, floor_ft: float, ceiling_ft: float) -> bool
     return floor_ft <= alt_ft <= ceiling_ft
 
 
+def _event_tfr_zone(event: Mapping[str, Any]) -> AirspaceZone | None:
+    if event.get("type") != "TFR_POPUP" or event.get("status") != "active":
+        return None
+    params = event.get("params")
+    if not isinstance(params, Mapping):
+        return None
+    polygon = params.get("polygon")
+    if not isinstance(polygon, Sequence):
+        return None
+    return AirspaceZone(
+        zone_id=str(params.get("zone_id", event.get("event_id", "tfr_popup"))),
+        name=str(params.get("name", "Pop-up TFR")),
+        polygon=tuple((float(point[0]), float(point[1])) for point in polygon),
+        floor_ft=float(params.get("floor_ft", 0.0)),
+        ceiling_ft=float(params.get("ceiling_ft", 2000.0)),
+        airspace_class="NO_FLY",
+        authorization_required=True,
+    )
+
+
+def _all_airspace_zones(sim: SimState | None = None) -> tuple[AirspaceZone, ...]:
+    zones = list(AIRSPACE_ZONES)
+    if sim is not None:
+        for event in sim.events:
+            zone = _event_tfr_zone(event)
+            if zone is not None:
+                zones.append(zone)
+    return tuple(zones)
+
+
 def _airspace_conflicts_for_segment(
+    sim: SimState,
     start: Waypoint,
     end: Waypoint,
     alt_ft: float,
@@ -673,7 +724,7 @@ def _airspace_conflicts_for_segment(
     end_point = (end.lat, end.lon)
     return [
         zone
-        for zone in AIRSPACE_ZONES
+        for zone in _all_airspace_zones(sim)
         if _vertical_overlap(alt_ft, zone.floor_ft, zone.ceiling_ft)
         and _route_crosses_polygon(start_point, end_point, zone.polygon)
     ]
@@ -690,15 +741,114 @@ def min_safe_altitude_ft(lat: float, lon: float) -> float:
     return max(matching) if matching else 100.0
 
 
-def _nearest_site(lat: float, lon: float) -> Site:
+def _nearest_site(lat: float, lon: float, closed_site_ids: Sequence[str] = ()) -> Site:
+    open_sites = [
+        site
+        for site in SITES.values()
+        if site.site_id not in set(closed_site_ids)
+    ] or list(SITES.values())
     return min(
-        SITES.values(),
+        open_sites,
         key=lambda site: haversine_nm(lat, lon, site.lat, site.lon),
     )
 
 
-def _scenario_for_index(index: int) -> dict[str, Any]:
-    return SCENARIOS[index % len(SCENARIOS)]
+def _scenario_par(launch_site: Site, target: Waypoint, sla_min: float) -> dict[str, float]:
+    distance_to_target = haversine_nm(launch_site.lat, launch_site.lon, target.lat, target.lon)
+    direct_time_s = 2.0 * distance_to_target / DEFAULT_AIRSPEED_KT * 3600.0 + 2.0 * TOOL_LATENCY_S
+    direct_energy_wh = 2.0 * _segment_energy_wh(
+        distance_nm=distance_to_target,
+        airspeed_kt=DEFAULT_AIRSPEED_KT,
+        start_alt_ft=0.0,
+        end_alt_ft=250.0,
+    )
+    return {
+        "time_s": max(direct_time_s, sla_min * 60.0 * 0.65),
+        "energy_wh": max(direct_energy_wh, BATTERY_WH * 0.25),
+    }
+
+
+def _tfr_event_polygon(target: Waypoint) -> tuple[tuple[float, float], ...]:
+    lat_delta = 0.018
+    lon_delta = 0.022
+    return (
+        (target.lat - lat_delta, target.lon - lon_delta),
+        (target.lat + lat_delta, target.lon - lon_delta),
+        (target.lat + lat_delta, target.lon + lon_delta),
+        (target.lat - lat_delta, target.lon + lon_delta),
+    )
+
+
+def _day4_t1_event(seed: int, index: int, base: Mapping[str, Any]) -> dict[str, Any]:
+    rng = np.random.default_rng(seed * 1009 + index * 17)
+    event_type = ("WIND_SHIFT", "TFR_POPUP", "BATT_DEGRADE", "SITE_CLOSED")[index % 4]
+    event_id = f"{base['scenario_id']}-{event_type.lower()}"
+    target = cast(Waypoint, base["target"])
+    if event_type == "WIND_SHIFT":
+        params = {
+            "dir_delta_deg": float(rng.choice([-70.0, -55.0, 55.0, 70.0])),
+            "speed_delta_kt": float(rng.uniform(8.0, 14.0)),
+        }
+        message = "WIND_SHIFT: observed winds have shifted; recompute route energy before continuing."
+    elif event_type == "TFR_POPUP":
+        params = {
+            "zone_id": f"tfr_{index}",
+            "name": "Pop-up Bay Area TFR",
+            "polygon": _tfr_event_polygon(target),
+            "floor_ft": 0.0,
+            "ceiling_ft": 2000.0,
+        }
+        message = "TFR_POPUP: NOTAM active near the target, surface to 2000 ft; avoid the polygon."
+    elif event_type == "BATT_DEGRADE":
+        params = {"capacity_loss_pct": float(rng.uniform(12.0, 22.0))}
+        message = "BATT_DEGRADE: pack health degraded; reserve margin is reduced."
+    else:
+        launch_site = SITES[cast(str, base["launch_site_id"])]
+        candidates = [
+            site
+            for site in SITES.values()
+            if site.site_id != launch_site.site_id
+        ]
+        closed_site = min(
+            candidates,
+            key=lambda site: haversine_nm(target.lat, target.lon, site.lat, site.lon),
+        )
+        params = {"site_id": closed_site.site_id, "site_name": closed_site.name}
+        message = f"SITE_CLOSED: {closed_site.name} is unavailable for recovery."
+    return {
+        "event_id": event_id,
+        "type": event_type,
+        "trigger_time_s": 20.0,
+        "status": "pending",
+        "message": message,
+        "params": params,
+    }
+
+
+def _scenario_for_index(index: int, seed: int = 0, tier: str = "mixed_day4") -> dict[str, Any]:
+    base = dict(SCENARIOS[index % len(SCENARIOS)])
+    requested_tier = tier.upper()
+    scenario_tier = "T1" if requested_tier in {"T1", "MIXED_DAY4", "MIXED"} and index % 2 == 1 else "T0"
+    if requested_tier == "T1":
+        scenario_tier = "T1"
+    elif requested_tier == "T0":
+        scenario_tier = "T0"
+
+    base["tier"] = scenario_tier
+    base["scenario_id"] = f"{scenario_tier}-{index:03d}-{base['scenario_id'][3:]}"
+    base["events"] = []
+    if scenario_tier == "T1":
+        base["events"] = [_day4_t1_event(seed, index, base)]
+        base["description"] = f"{base['description']} Expect one operational interrupt."
+        base["sla_min"] = float(base["sla_min"]) + 10.0
+
+    launch_site = SITES[cast(str, base["launch_site_id"])]
+    base["par"] = _scenario_par(
+        launch_site=launch_site,
+        target=cast(Waypoint, base["target"]),
+        sla_min=float(base["sla_min"]),
+    )
+    return base
 
 
 def _move_latlon(lat: float, lon: float, bearing: float, distance_nm: float) -> tuple[float, float]:
@@ -885,6 +1035,7 @@ def _build_sim(
     seed: int,
     scenario_index: int,
     *,
+    tier: str = "mixed_day4",
     wind_enabled: bool = True,
     gust_front_probability: float = 0.5,
 ) -> SimState:
@@ -894,7 +1045,7 @@ def _build_sim(
         wind_enabled=wind_enabled,
         gust_front_probability=gust_front_probability,
     )
-    scenario = _scenario_for_index(scenario_index)
+    scenario = _scenario_for_index(scenario_index, seed=seed, tier=tier)
     launch_site = SITES[cast(str, scenario["launch_site_id"])]
     mission = Mission(
         mission_id=cast(str, scenario["scenario_id"]),
@@ -906,6 +1057,7 @@ def _build_sim(
     return SimState(
         seed=seed,
         scenario_id=mission.mission_id,
+        tier=str(scenario["tier"]),
         sim_time_s=0.0,
         aircraft=Aircraft(
             lat=launch_site.lat,
@@ -917,15 +1069,26 @@ def _build_sim(
         home_site_id=launch_site.site_id,
         wind=wind,
         rng_state=_pack_rng_state(cast(Mapping[str, Any], rng.bit_generator.state)),
+        scenario_par=dict(cast(Mapping[str, float], scenario["par"])),
+        events=[dict(event) for event in scenario.get("events", [])],
     )
 
 
 def _scenario_briefing(scenario: dict[str, Any]) -> str:
     launch_site = SITES[cast(str, scenario["launch_site_id"])]
     target = cast(Waypoint, scenario["target"])
+    events = list(scenario.get("events", []))
+    event_line = (
+        "- Airspace/events: no active pop-up restrictions in this T0 scenario; "
+        "static airspace/geofence checks still apply\n"
+        if not events
+        else "- Airspace/events: T1 scenario with one seeded operational interrupt; "
+        "acknowledge alerts and re-check affected constraints before continuing\n"
+    )
     return (
         "Mission briefing\n"
         f"- Scenario: {scenario['scenario_id']}\n"
+        f"- Tier: {scenario.get('tier', 'T0')}\n"
         f"- Launch/recovery: {launch_site.name} ({launch_site.site_id}) "
         f"{launch_site.lat:.4f}, {launch_site.lon:.4f}\n"
         f"- Task: {scenario['description']}\n"
@@ -933,27 +1096,28 @@ def _scenario_briefing(scenario: dict[str, Any]) -> str:
         f"- SLA: complete within {float(scenario['sla_min']):.0f} simulated minutes\n"
         "- Weather: seeded Bay Area wind field; query get_weather for current "
         "winds, altitude shear, and gust-front forecast\n"
-        "- Airspace: no active pop-up restrictions in this T0 scenario; static "
-        "airspace/geofence checks still apply\n"
+        f"{event_line}"
         "- Expected flow: query the console as needed, file a plan to the target, "
         "release payload/confirm work if appropriate, then command RTL after "
         "mission completion.\n"
     )
 
 
-def _dataset(seed: int, max_examples: int) -> Dataset:
-    count = len(SCENARIOS) if max_examples < 0 else min(max_examples, len(SCENARIOS))
+def _dataset(seed: int, max_examples: int, tier: str = "mixed_day4") -> Dataset:
+    count = DAY4_DEFAULT_EXAMPLES if max_examples < 0 else max_examples
     rows = []
     for index in range(count):
-        scenario = _scenario_for_index(index)
+        scenario_seed = seed + index
+        scenario = _scenario_for_index(index, seed=scenario_seed, tier=tier)
         rows.append(
             {
                 "question": _scenario_briefing(scenario),
                 "answer": scenario["scenario_id"],
                 "info": {
-                    "seed": seed + index,
+                    "seed": scenario_seed,
                     "scenario_index": index,
                     "scenario_id": scenario["scenario_id"],
+                    "tier": scenario["tier"],
                 },
             }
         )
@@ -1115,6 +1279,7 @@ def _advance_segment(
         sim.aircraft.status = "lost"
         sim.is_terminal = True
         sim.terminal_reason = "aircraft_lost_battery_depleted"
+        _record_unique(sim.hard_safety_violations, "aircraft_loss:battery_depleted")
 
     return {
         "from": {"lat": start_lat, "lon": start_lon, "alt_ft": start_alt},
@@ -1211,8 +1376,10 @@ def _telemetry(sim: SimState) -> dict[str, Any]:
             "gust_front": _gust_front_summary(sim),
         },
         "active_failsafe": sim.active_failsafe,
+        "active_events": sim.active_events,
         "alerts": sim.alerts,
         "acknowledged_alerts": sim.acknowledged_alerts,
+        "closed_site_ids": sim.closed_sites,
         "overrides": sim.overrides,
         "payload_released": sim.payload_released,
         "last_action": sim.last_action,
@@ -1234,6 +1401,93 @@ def _append_alert(
             "metadata": dict(metadata or {}),
         }
     )
+
+
+def _record_unique(values: list[str], value: str) -> None:
+    if value not in values:
+        values.append(value)
+
+
+def _apply_event_effect(sim: SimState, event: dict[str, Any]) -> None:
+    params = event.get("params", {})
+    if not isinstance(params, Mapping):
+        params = {}
+    event_type = str(event.get("type", ""))
+    if event_type == "WIND_SHIFT":
+        sim.wind = WindField(
+            base_dir_deg_from=(
+                sim.wind.base_dir_deg_from + float(params.get("dir_delta_deg", 0.0))
+            )
+            % 360.0,
+            base_speed_kt=max(
+                0.0,
+                sim.wind.base_speed_kt + float(params.get("speed_delta_kt", 0.0)),
+            ),
+            blobs=sim.wind.blobs,
+            gust_front=sim.wind.gust_front,
+        )
+    elif event_type == "BATT_DEGRADE":
+        capacity_loss_pct = float(params.get("capacity_loss_pct", 0.0))
+        sim.aircraft.battery_wh = max(
+            0.0,
+            sim.aircraft.battery_wh - BATTERY_WH * capacity_loss_pct / 100.0,
+        )
+        if sim.aircraft.battery_wh <= 0.0:
+            sim.aircraft.status = "lost"
+            sim.is_terminal = True
+            sim.terminal_reason = "aircraft_lost_battery_depleted"
+            _record_unique(sim.hard_safety_violations, "aircraft_loss:battery_depleted")
+    elif event_type == "SITE_CLOSED":
+        site_id = str(params.get("site_id", ""))
+        if site_id in SITES:
+            _record_unique(sim.closed_sites, site_id)
+
+
+def _apply_due_events(sim: SimState) -> list[dict[str, Any]]:
+    activated: list[dict[str, Any]] = []
+    for event in sim.events:
+        if event.get("status") != "pending":
+            continue
+        if float(event.get("trigger_time_s", math.inf)) > sim.sim_time_s:
+            continue
+        event["status"] = "active"
+        event["activated_time_s"] = round(sim.sim_time_s, 1)
+        event_id = str(event.get("event_id", event.get("type", "event")))
+        _record_unique(sim.active_events, event_id)
+        _apply_event_effect(sim, event)
+        _append_alert(
+            sim,
+            event_id,
+            str(event.get("message", event.get("type", "Operational event"))),
+            {
+                "event_type": event.get("type"),
+                "params": event.get("params", {}),
+            },
+        )
+        activated.append(event)
+    return activated
+
+
+def _event_interrupt_result(sim: SimState, tool_name: str) -> dict[str, Any] | None:
+    if not sim.active_events:
+        return None
+    sim.last_action = tool_name
+    sim.last_result = {
+        "ok": False,
+        "error": "event_interrupt",
+        "active_events": list(sim.active_events),
+        "alerts": sim.alerts,
+        "telemetry": _telemetry(sim),
+    }
+    return sim.last_result
+
+
+def _charge_latency(sim: SimState, seconds: float, tool_name: str) -> dict[str, Any] | None:
+    sim.sim_time_s += seconds
+    _apply_due_events(sim)
+    if tool_name in EVENT_BLOCKED_TOOLS:
+        return _event_interrupt_result(sim, tool_name)
+    return None
 
 
 def _route_validation(
@@ -1275,7 +1529,7 @@ def _route_validation(
         if alt_ft < safe_alt_ft:
             warnings.append(f"min_safe_altitude_violation:{safe_alt_ft:.0f}ft_required")
 
-        for zone in _airspace_conflicts_for_segment(start, waypoint, alt_ft):
+        for zone in _airspace_conflicts_for_segment(sim, start, waypoint, alt_ft):
             if zone.authorization_required:
                 geofence_conflicts.append(zone)
             else:
@@ -1308,6 +1562,8 @@ def _trigger_geofence_hold(sim: SimState, zones: Sequence[AirspaceZone]) -> dict
         "Predicted unauthorized airspace incursion; autopilot holding before entry.",
         {"zones": zone_payload},
     )
+    for zone in zones:
+        _record_unique(sim.procedure_violations, f"filed_known_conflict:{zone.zone_id}")
     return {
         "ok": False,
         "error": "failsafe:GEOFENCE_HOLD",
@@ -1319,7 +1575,7 @@ def _trigger_geofence_hold(sim: SimState, zones: Sequence[AirspaceZone]) -> dict
 
 def _trigger_low_batt_rtl(sim: SimState) -> dict[str, Any]:
     sim.active_failsafe = "LOW_BATT_RTL"
-    site = _nearest_site(sim.aircraft.lat, sim.aircraft.lon)
+    site = _nearest_site(sim.aircraft.lat, sim.aircraft.lon, sim.closed_sites)
     _append_alert(
         sim,
         "LOW_BATT_RTL",
@@ -1373,14 +1629,14 @@ def _airspace_zone_payload(zone: AirspaceZone) -> dict[str, Any]:
 
 
 def _execute_get_telemetry(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "get_telemetry")
     sim.last_action = "get_telemetry"
     sim.last_result = _telemetry(sim)
     return sim.last_result
 
 
 def _execute_get_weather(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "get_weather")
     lat = float(args.get("lat", sim.aircraft.lat))
     lon = float(args.get("lon", sim.aircraft.lon))
     alt_ft = float(args.get("alt_ft", sim.aircraft.alt_ft))
@@ -1413,7 +1669,7 @@ def _execute_get_weather(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
 
 
 def _execute_get_airspace(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "get_airspace")
     conflicts: list[dict[str, Any]] = []
     warnings: list[str] = []
     errors: list[str] = []
@@ -1432,7 +1688,7 @@ def _execute_get_airspace(sim: SimState, args: Mapping[str, Any]) -> dict[str, A
     sim.last_action = "get_airspace"
     sim.last_result = {
         "ok": not errors,
-        "zones": [_airspace_zone_payload(zone) for zone in AIRSPACE_ZONES],
+        "zones": [_airspace_zone_payload(zone) for zone in _all_airspace_zones(sim)],
         "route_errors": errors,
         "route_warnings": warnings,
         "route_conflicts": conflicts,
@@ -1441,7 +1697,7 @@ def _execute_get_airspace(sim: SimState, args: Mapping[str, Any]) -> dict[str, A
 
 
 def _execute_get_mission_status(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "get_mission_status")
     sim.last_action = "get_mission_status"
     sim.last_result = {
         "ok": True,
@@ -1453,18 +1709,21 @@ def _execute_get_mission_status(sim: SimState, _args: Mapping[str, Any]) -> dict
 
 
 def _execute_get_sites(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "get_sites")
     sim.last_action = "get_sites"
     sim.last_result = {
         "ok": True,
         "sites": [asdict(site) for site in SITES.values()],
-        "nearest_site_id": _nearest_site(sim.aircraft.lat, sim.aircraft.lon).site_id,
+        "nearest_site_id": _nearest_site(sim.aircraft.lat, sim.aircraft.lon, sim.closed_sites).site_id,
+        "closed_site_ids": list(sim.closed_sites),
     }
     return sim.last_result
 
 
 def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, TOOL_LATENCY_S, "file_flight_plan")
+    if interrupt is not None:
+        return interrupt
 
     try:
         raw_waypoints = args["waypoints"]
@@ -1560,7 +1819,9 @@ def _execute_amend_route(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
 
 
 def _execute_set_altitude(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, TOOL_LATENCY_S, "set_altitude")
+    if interrupt is not None:
+        return interrupt
     try:
         alt_ft = float(args["ft"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -1582,7 +1843,9 @@ def _execute_set_altitude(sim: SimState, args: Mapping[str, Any]) -> dict[str, A
 
 
 def _execute_set_speed(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, TOOL_LATENCY_S, "set_speed")
+    if interrupt is not None:
+        return interrupt
     try:
         airspeed_kt = float(args["kt"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -1602,7 +1865,7 @@ def _execute_set_speed(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]
 
 
 def _execute_hold(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    _charge_latency(sim, TOOL_LATENCY_S, "hold")
     try:
         minutes = float(args["minutes"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -1616,6 +1879,7 @@ def _execute_hold(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
         sim.last_result = {"ok": False, "error": "hold_minutes_outside_0_60"}
         return sim.last_result
     sim.sim_time_s += minutes * 60.0
+    _apply_due_events(sim)
     sim.hold_until_s = sim.sim_time_s
     if sim.aircraft.status in {"airborne", "holding"}:
         sim.aircraft.status = "holding"
@@ -1625,7 +1889,9 @@ def _execute_hold(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _execute_resume(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, TOOL_LATENCY_S, "resume")
+    if interrupt is not None:
+        return interrupt
     if sim.active_failsafe is not None:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
         sim.last_action = "resume"
@@ -1643,12 +1909,17 @@ def _execute_resume(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _execute_command_rtl(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    _charge_latency(sim, TOOL_LATENCY_S, "command_rtl")
     site_id = args.get("site_id")
     if site_id is None or site_id == "":
-        site = _nearest_site(sim.aircraft.lat, sim.aircraft.lon)
-    elif str(site_id) in SITES:
+        site = _nearest_site(sim.aircraft.lat, sim.aircraft.lon, sim.closed_sites)
+    elif str(site_id) in SITES and str(site_id) not in sim.closed_sites:
         site = SITES[str(site_id)]
+    elif str(site_id) in sim.closed_sites:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "command_rtl"
+        sim.last_result = {"ok": False, "error": f"closed_site_id:{site_id}"}
+        return sim.last_result
     else:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
         sim.last_action = "command_rtl"
@@ -1687,14 +1958,21 @@ def _execute_command_rtl(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
 
 
 def _execute_land_now(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, HIGH_IMPACT_TOOL_LATENCY_S, "land_now")
+    if interrupt is not None:
+        return interrupt
     site_id = args.get("site_id")
     if site_id is None or site_id == "":
         target = Waypoint(sim.aircraft.lat, sim.aircraft.lon, "current_position")
         site: Site | None = None
-    elif str(site_id) in SITES:
+    elif str(site_id) in SITES and str(site_id) not in sim.closed_sites:
         site = SITES[str(site_id)]
         target = Waypoint(site.lat, site.lon, site.name)
+    elif str(site_id) in sim.closed_sites:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "land_now"
+        sim.last_result = {"ok": False, "error": f"closed_site_id:{site_id}"}
+        return sim.last_result
     else:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
         sim.last_action = "land_now"
@@ -1723,7 +2001,9 @@ def _execute_land_now(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _execute_release_payload(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, TOOL_LATENCY_S, "release_payload")
+    if interrupt is not None:
+        return interrupt
     if _mission_distance_to_target(sim) > 0.2:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
         sim.last_action = "release_payload"
@@ -1743,7 +2023,7 @@ def _execute_release_payload(sim: SimState, _args: Mapping[str, Any]) -> dict[st
 
 
 def _execute_abort_mission(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    _charge_latency(sim, HIGH_IMPACT_TOOL_LATENCY_S, "abort_mission")
     mission_id = str(args.get("mission_id", ""))
     if mission_id != sim.mission.mission_id:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
@@ -1760,7 +2040,9 @@ def _execute_abort_mission(sim: SimState, args: Mapping[str, Any]) -> dict[str, 
 
 
 def _execute_override_failsafe(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    interrupt = _charge_latency(sim, HIGH_IMPACT_TOOL_LATENCY_S, "override_failsafe")
+    if interrupt is not None:
+        return interrupt
     failsafe_id = str(args.get("id", ""))
     justification = str(args.get("justification_code", ""))
     if justification not in VALID_OVERRIDE_JUSTIFICATIONS:
@@ -1791,7 +2073,7 @@ def _execute_override_failsafe(sim: SimState, args: Mapping[str, Any]) -> dict[s
 
 
 def _execute_acknowledge(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += READ_TOOL_LATENCY_S
+    _charge_latency(sim, READ_TOOL_LATENCY_S, "acknowledge")
     alert_id = str(args.get("alert_id", ""))
     if alert_id not in {str(alert["alert_id"]) for alert in sim.alerts}:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
@@ -1800,6 +2082,9 @@ def _execute_acknowledge(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
         return sim.last_result
     if alert_id not in sim.acknowledged_alerts:
         sim.acknowledged_alerts.append(alert_id)
+    if alert_id in sim.active_events:
+        sim.active_events.remove(alert_id)
+        _record_unique(sim.acknowledged_events, alert_id)
     sim.last_action = "acknowledge"
     sim.last_result = {"ok": True, "acknowledged_alerts": sim.acknowledged_alerts}
     return sim.last_result
@@ -1853,6 +2138,7 @@ def _state_sim(state: vf.State) -> SimState:
     return SimState(
         seed=int(state["sim_state"]["seed"]),
         scenario_id=str(state["sim_state"]["scenario_id"]),
+        tier=str(state["sim_state"].get("tier", "T0")),
         sim_time_s=float(state["sim_state"]["sim_time_s"]),
         aircraft=Aircraft(**state["sim_state"]["aircraft"]),
         mission=Mission(
@@ -1869,6 +2155,13 @@ def _state_sim(state: vf.State) -> SimState:
                 state["sim_state"].get("rng_state", np.random.default_rng(0).bit_generator.state),
             )
         ),
+        scenario_par=dict(state["sim_state"].get("scenario_par", {})),
+        events=[dict(event) for event in state["sim_state"].get("events", [])],
+        active_events=list(state["sim_state"].get("active_events", [])),
+        acknowledged_events=list(state["sim_state"].get("acknowledged_events", [])),
+        closed_sites=list(state["sim_state"].get("closed_sites", [])),
+        hard_safety_violations=list(state["sim_state"].get("hard_safety_violations", [])),
+        procedure_violations=list(state["sim_state"].get("procedure_violations", [])),
         current_plan=[
             Waypoint(**waypoint) for waypoint in state["sim_state"].get("current_plan", [])
         ],
@@ -1898,13 +2191,21 @@ def _store_sim(state: vf.State, sim: SimState, event: str) -> None:
     state.setdefault("sim_log", []).append(_snapshot(sim, event))
 
 
-def mission_value(state: vf.State) -> float:
-    """Mission value reward, computed only from simulator state."""
+def _final_log_snapshot(state: vf.State) -> Mapping[str, Any] | None:
+    sim_log = state.get("sim_log")
+    if not isinstance(sim_log, Sequence) or isinstance(sim_log, (str, bytes)) or not sim_log:
+        return None
+    final = sim_log[-1]
+    return final if isinstance(final, Mapping) else None
 
-    sim_state = state.get("sim_state")
-    if not isinstance(sim_state, Mapping):
+
+def mission_value(state: vf.State) -> float:
+    """Mission value reward, computed only from logged simulator state."""
+
+    snapshot = _final_log_snapshot(state)
+    if snapshot is None:
         return 0.0
-    mission = sim_state.get("mission")
+    mission = snapshot.get("mission")
     if not isinstance(mission, Mapping) or mission.get("status") != "completed":
         return 0.0
     completed_time = mission.get("completed_time_s")
@@ -1919,17 +2220,124 @@ def mission_value(state: vf.State) -> float:
     return value * decay
 
 
+def hard_safety(state: vf.State) -> float:
+    """Hard safety penalty from logged sim outcomes only."""
+
+    snapshot = _final_log_snapshot(state)
+    if snapshot is None:
+        return 0.0
+    violations = set(snapshot.get("hard_safety_violations", []))
+    aircraft = snapshot.get("aircraft", {})
+    if isinstance(aircraft, Mapping) and aircraft.get("status") == "lost":
+        violations.add("aircraft_loss")
+    terminal_reason = str(snapshot.get("terminal_reason", ""))
+    if terminal_reason.startswith("aircraft_lost"):
+        violations.add("aircraft_loss")
+    battery_pct = float(snapshot.get("battery_pct", 100.0))
+    if battery_pct <= 12.0 and isinstance(aircraft, Mapping) and aircraft.get("status") != "landed":
+        violations.add("crit_batt_airborne")
+    return -5.0 * float(len(violations))
+
+
+def margin_policy(state: vf.State) -> float:
+    """Reserve, override, and clearance policy penalty from sim logs."""
+
+    snapshot = _final_log_snapshot(state)
+    if snapshot is None:
+        return 0.0
+    penalty = 0.0
+    aircraft = snapshot.get("aircraft", {})
+    battery_pct = float(snapshot.get("battery_pct", 100.0))
+    if isinstance(aircraft, Mapping) and aircraft.get("status") == "landed":
+        reserve_shortfall = max(0.0, BRIEFED_RESERVE_PCT - battery_pct) / BRIEFED_RESERVE_PCT
+        penalty -= min(1.0, reserve_shortfall)
+    overrides = snapshot.get("overrides", [])
+    if isinstance(overrides, Sequence) and not isinstance(overrides, (str, bytes)):
+        poor_outcome = battery_pct < BRIEFED_RESERVE_PCT or hard_safety(state) < 0.0
+        if poor_outcome:
+            penalty -= min(1.0, 0.25 * len(overrides))
+
+    sim_log = state.get("sim_log", [])
+    min_safe_hits = 0
+    if isinstance(sim_log, Sequence) and not isinstance(sim_log, (str, bytes)):
+        for entry in sim_log:
+            if not isinstance(entry, Mapping):
+                continue
+            result = entry.get("last_result", {})
+            if not isinstance(result, Mapping):
+                continue
+            warnings = result.get("warnings", [])
+            if isinstance(warnings, Sequence) and not isinstance(warnings, (str, bytes)):
+                min_safe_hits += sum(
+                    1 for warning in warnings if str(warning).startswith("min_safe_altitude_violation")
+                )
+    penalty -= min(1.0, 0.2 * min_safe_hits)
+    return max(-2.0, penalty)
+
+
+def procedure(state: vf.State) -> float:
+    """Procedural compliance penalty from alerts and logged violations."""
+
+    snapshot = _final_log_snapshot(state)
+    if snapshot is None:
+        return 0.0
+    alerts = snapshot.get("alerts", [])
+    acknowledged = set(snapshot.get("acknowledged_alerts", []))
+    unacked = 0
+    if isinstance(alerts, Sequence) and not isinstance(alerts, (str, bytes)):
+        for alert in alerts:
+            if isinstance(alert, Mapping) and str(alert.get("alert_id", "")) not in acknowledged:
+                unacked += 1
+    violations = snapshot.get("procedure_violations", [])
+    violation_count = len(violations) if isinstance(violations, Sequence) else 0
+    return -0.1 * float(unacked + violation_count)
+
+
+def efficiency(state: vf.State) -> float:
+    """Efficiency penalty normalized by scenario par from the sim log."""
+
+    snapshot = _final_log_snapshot(state)
+    if snapshot is None:
+        return 0.0
+    par = snapshot.get("scenario_par", {})
+    aircraft = snapshot.get("aircraft", {})
+    if not isinstance(par, Mapping) or not isinstance(aircraft, Mapping):
+        return 0.0
+    par_time_s = max(1.0, float(par.get("time_s", 1.0)))
+    par_energy_wh = max(1.0, float(par.get("energy_wh", 1.0)))
+    time_ratio = max(0.0, float(snapshot.get("sim_time_s", 0.0)) / par_time_s - 1.0)
+    energy_used_wh = max(0.0, BATTERY_WH - float(aircraft.get("battery_wh", BATTERY_WH)))
+    energy_ratio = max(0.0, energy_used_wh / par_energy_wh - 1.0)
+    return -0.3 * min(1.0, (time_ratio + energy_ratio) / 2.0)
+
+
+def reward_breakdown(state: vf.State) -> dict[str, float]:
+    """Return component scores using only saved simulator logs."""
+
+    components = {
+        "mission_value": mission_value(state),
+        "hard_safety": hard_safety(state),
+        "margin_policy": margin_policy(state),
+        "procedure": procedure(state),
+        "efficiency": efficiency(state),
+    }
+    components["total"] = sum(components.values())
+    return components
+
+
 class UAVOperatorEnv(vf.MultiTurnEnv):
     """Verifiers MultiTurnEnv for small-UAS operator decisions."""
 
     def __init__(
         self,
         sim_time_cap_min: int = 90,
+        tier: str = "mixed_day4",
         wind_enabled: bool = True,
         gust_front_probability: float = 0.5,
         **kwargs: Any,
     ) -> None:
         self.sim_time_cap_s = float(sim_time_cap_min) * 60.0
+        self.tier = tier
         self.wind_enabled = wind_enabled
         self.gust_front_probability = gust_front_probability
         super().__init__(**kwargs)
@@ -1940,9 +2348,11 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
             info = {}
         seed = int(info.get("seed", 0))
         scenario_index = int(info.get("scenario_index", 0))
+        tier = str(info.get("tier", self.tier))
         sim = _build_sim(
             seed=seed,
             scenario_index=scenario_index,
+            tier=tier,
             wind_enabled=self.wind_enabled,
             gust_front_probability=self.gust_front_probability,
         )
@@ -2059,7 +2469,8 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
             final_summary = {
                 "terminal": True,
                 "terminal_reason": sim.terminal_reason,
-                "reward_preview": mission_value(state),
+                "reward_preview": reward_breakdown(state)["total"],
+                "reward_breakdown": reward_breakdown(state),
                 "telemetry": _telemetry(sim),
             }
             responses.append(vf.UserMessage(content=json.dumps(final_summary, sort_keys=True)))
@@ -2075,10 +2486,14 @@ def load_environment(**kwargs: object) -> vf.Environment:
     max_examples = int(kwargs.pop("max_examples", -1))
     max_turns = int(kwargs.pop("max_turns", 40))
     sim_time_cap_min = int(kwargs.pop("sim_time_cap_min", 90))
+    tier = str(kwargs.pop("tier", "mixed_day4"))
     wind_enabled = bool(kwargs.pop("wind_enabled", True))
     gust_front_probability = float(kwargs.pop("gust_front_probability", 0.5))
-    dataset = _dataset(seed=seed, max_examples=max_examples)
-    rubric = vf.Rubric(funcs=[mission_value], weights=[1.0])
+    dataset = _dataset(seed=seed, max_examples=max_examples, tier=tier)
+    rubric = vf.Rubric(
+        funcs=[mission_value, hard_safety, margin_policy, procedure, efficiency],
+        weights=[1.0, 1.0, 1.0, 1.0, 1.0],
+    )
     return UAVOperatorEnv(
         env_id=ENV_ID,
         dataset=dataset,
@@ -2088,6 +2503,7 @@ def load_environment(**kwargs: object) -> vf.Environment:
         rubric=rubric,
         max_turns=max_turns,
         sim_time_cap_min=sim_time_cap_min,
+        tier=tier,
         wind_enabled=wind_enabled,
         gust_front_probability=gust_front_probability,
         **kwargs,

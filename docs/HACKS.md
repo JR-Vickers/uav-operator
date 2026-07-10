@@ -19,3 +19,35 @@ Current defense:
 Open TODO:
 - Add an explicit regression transcript once live `vf-eval` is running, with a
   model attempting to success-claim without a valid `file_flight_plan`.
+
+## Day 4 reward v0: override and stall paths
+
+Exploit idea:
+- The model repeatedly acknowledges/overrides or holds instead of solving the
+  mission, hoping procedure text or elapsed turns produce credit.
+
+Current defense:
+- Reward reads only saved `sim_log` snapshots.
+- Unacknowledged alerts and known conflict filings are priced by `procedure`.
+- Poor-outcome overrides are priced by `margin_policy`.
+- Simulated time and energy above generated par are priced by `efficiency`.
+- Local baselines show the conservative rulebook policy beats the reckless
+  push/override policy on the same T0-T1 seeds.
+
+Open TODO:
+- Hold/stall farming needs a stronger regression once T2/T3 deadlines and
+  composed events exist.
+
+## Day 4 reward v0: abort conservatism
+
+Exploit idea:
+- The model aborts every T1 event to avoid safety penalties.
+
+Current defense:
+- Aborted missions receive no `mission_value`, so they lose the primary reward
+  opportunity even when they avoid hard-safety penalties.
+- T1 TFR cases may still make abort/RTL the rulebook answer; T2 is where this
+  must stop being sufficient.
+
+Open TODO:
+- Add T2 composed scenarios where conservative abort loses to a safe replan.

@@ -7,6 +7,7 @@ from typing import Any
 import msgpack
 import verifiers as vf
 
+from scripts import baselines
 import uav_operator
 
 
@@ -24,10 +25,14 @@ def _assistant_tool(name: str, args: dict[str, Any], call_id: str = "call_1") ->
     }
 
 
-def _setup_state(seed: int = 0, scenario_index: int = 0) -> tuple[uav_operator.UAVOperatorEnv, vf.State]:
-    env = uav_operator.load_environment(max_examples=1)
+def _setup_state(
+    seed: int = 0,
+    scenario_index: int = 0,
+    tier: str = "T0",
+) -> tuple[uav_operator.UAVOperatorEnv, vf.State]:
+    env = uav_operator.load_environment(max_examples=1, tier=tier)
     assert isinstance(env, uav_operator.UAVOperatorEnv)
-    state = vf.State(info={"seed": seed, "scenario_index": scenario_index})
+    state = vf.State(info={"seed": seed, "scenario_index": scenario_index, "tier": tier})
     asyncio.run(env.setup_state(state))
     return env, state
 
@@ -40,7 +45,7 @@ def test_load_environment_exposes_day1_dataset_and_tools() -> None:
     env = uav_operator.load_environment()
 
     assert env.env_id == uav_operator.ENV_ID
-    assert len(env.get_eval_dataset()) == 5
+    assert len(env.get_eval_dataset()) == uav_operator.DAY4_DEFAULT_EXAMPLES
     assert [tool.name for tool in env.tool_defs or []] == [
         "get_telemetry",
         "get_weather",
@@ -351,3 +356,70 @@ def test_same_seed_and_action_sequence_are_deterministic() -> None:
 
     assert first_state == second_state
     assert first_log == second_log
+
+
+def test_day4_dataset_emits_deterministic_t0_t1_mix() -> None:
+    env = uav_operator.load_environment(seed=100, max_examples=6, tier="mixed_day4")
+    rows = list(env.get_eval_dataset())
+
+    assert [row["info"]["tier"] for row in rows] == ["T0", "T1", "T0", "T1", "T0", "T1"]
+    assert rows == list(uav_operator.load_environment(seed=100, max_examples=6, tier="mixed_day4").get_eval_dataset())
+
+
+def test_day4_t1_event_interrupt_is_logged_and_acknowledged() -> None:
+    env, state = _setup_state(seed=31, scenario_index=1, tier="T1")
+    target = state["sim_state"]["mission"]["target"]
+
+    response = _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [target],
+            "alt_ft": 300,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+    result = json.loads(response[0].content)
+
+    assert result["ok"] is False
+    assert result["error"] == "event_interrupt"
+    assert state["sim_state"]["active_events"]
+    alert_id = state["sim_state"]["active_events"][0]
+
+    _run_tool(env, state, "acknowledge", {"alert_id": alert_id})
+
+    assert alert_id in state["sim_state"]["acknowledged_events"]
+    assert alert_id not in state["sim_state"]["active_events"]
+    assert state["sim_log"][-1]["events"][0]["status"] == "active"
+
+
+def test_day4_reward_components_use_logged_sim_state_not_prose() -> None:
+    env, state = _setup_state(seed=40, scenario_index=0, tier="T0")
+    state["messages"] = [{"role": "assistant", "content": "I completed the mission safely."}]
+
+    assert uav_operator.reward_breakdown(state)["total"] == 0.0
+
+    state["sim_log"][-1]["mission"]["status"] = "completed"
+    state["sim_log"][-1]["mission"]["completed_time_s"] = 60.0
+    state["sim_log"][-1]["aircraft"]["status"] = "lost"
+    state["sim_log"][-1]["hard_safety_violations"] = ["aircraft_loss"]
+
+    breakdown = uav_operator.reward_breakdown(state)
+    assert breakdown["mission_value"] == 1.0
+    assert breakdown["hard_safety"] == -5.0
+    assert breakdown["total"] < 0.0
+
+
+def test_day4_rulebook_baseline_beats_reckless_baseline() -> None:
+    async def run() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        rulebook = await baselines.run_many("rulebook", seed=70, episodes=8, tier="mixed_day4")
+        reckless = await baselines.run_many("reckless", seed=70, episodes=8, tier="mixed_day4")
+        return rulebook, reckless
+
+    rulebook_rows, reckless_rows = asyncio.run(run())
+    rulebook_avg = sum(row["reward"] for row in rulebook_rows) / len(rulebook_rows)
+    reckless_avg = sum(row["reward"] for row in reckless_rows) / len(reckless_rows)
+
+    assert rulebook_avg > reckless_avg

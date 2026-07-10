@@ -150,10 +150,10 @@ The generator verifies each scenario has ≥1 feasible resolution path
 | Component | Weight | Definition |
 |---|---|---|
 | mission_value | +1.0 scale | Per-mission value × completion × timeliness decay (briefed SLA curve); partial credit only where briefed |
-| hard_safety | −5.0 each, may terminate | Airspace/TFR incursion (post-effective-time), aircraft loss, CRIT_BATT event airborne over water/urban |
-| margin_policy | −0.0..−1.0 shaped | Landing reserve below briefed 20% (shaped), unjustified-by-outcome overrides, min-safe-alt violations |
+| hard_safety | −5.0 each, may terminate | Logged aircraft loss and critical-battery airborne outcomes; TFR/airspace incursions join here as dynamic incursion logging matures |
+| margin_policy | −0.0..−1.0 shaped | Landing reserve below briefed 20%, poor-outcome overrides, min-safe-alt violations |
 | procedure | −0.1 each | Unacknowledged alerts, filing through known conflicts, expired holds |
-| efficiency | −0.3 scale | Energy + sim-time cost normalized by scenario par (par computed by scripted baseline policy) |
+| efficiency | −0.3 scale | Energy + sim-time cost normalized by generated scenario par |
 
 Design invariants: (a) components computed ONLY from `sim_log`; (b) the
 scripted **rulebook baseline policy** (never overrides, always obeys failsafes,
@@ -162,6 +162,11 @@ naive replan) is implemented in `scripts/baselines.py` and must score
 isn't testing judgment, regenerate it; (c) a **reckless baseline** (always
 override, always push) must score *badly* — if it doesn't, hard_safety is
 underpriced. These two bots are the reward's unit tests and run in CI.
+
+Day 4 v0 implementation note: the active T1 event set is `WIND_SHIFT`,
+`TFR_POPUP`, `BATT_DEGRADE`, and `SITE_CLOSED`. `TRAFFIC_ADVISORY` and
+`PAYLOAD_ISSUE` are cut under the Day 4 fallback rule until later scope is
+explicitly reopened.
 
 ## 6. Curriculum tiers (difficulty dials: event count/severity, margin
 tightness, deadline pressure, brief ambiguity)

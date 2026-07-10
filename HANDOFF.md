@@ -1,5 +1,55 @@
 # HANDOFF.md
 
+## 2026-07-10 Day 4 reward v0 + first contact
+
+Changed:
+- Added seeded Day 4 scenario generation with default 20-example mixed T0/T1
+  eval rows and `tier` taskset selection.
+- Added serializable event state to `SimState`: event queue, active and
+  acknowledged events, closed recovery sites, procedure violations, hard-safety
+  violations, and generated scenario par.
+- Implemented T1 interrupts for `WIND_SHIFT`, `TFR_POPUP`, `BATT_DEGRADE`, and
+  `SITE_CLOSED`; mutating tools pause on active event alerts until the operator
+  acknowledges them.
+- Added dynamic TFRs as active airspace zones, closed-site avoidance for nearest
+  recovery selection, and event effects on wind/battery/site availability.
+- Replaced the mission-only rubric with Day 4 reward components:
+  `mission_value`, `hard_safety`, `margin_policy`, `procedure`, and
+  `efficiency`, all computed from saved `sim_log` snapshots.
+- Added `scripts/baselines.py` with rulebook and reckless policies that drive
+  the environment through the same tool-call path as model rollouts.
+- Added Day 4 tests for deterministic T0/T1 dataset generation, event
+  interrupt logging, prose-inert reward behavior, and rulebook > reckless.
+- Updated README, SPEC reward notes, and `docs/HACKS.md`.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run --with pytest pytest -q` passes: 15 tests.
+- `uv run python scripts/baselines.py --policy both --episodes 20 --tier mixed_day4`
+  passes the local gate: rulebook avg reward ≈ 0.7485, reckless avg reward
+  ≈ 0.6682.
+- Started live first-contact smoke:
+  `uv run vf-eval uav-operator -m poolside/laguna-m.1 -n 2 -r 1 --state-columns sim_state,sim_log`.
+  The first rollout completed with reward 1.0, but the second rollout produced
+  no further output after ~5 minutes and was interrupted. The command also
+  reported no local `./configs/endpoints.toml` registry, so use the workspace
+  Prime endpoint config or explicit `-b/-k` flags for the next live run.
+
+Broken / not done:
+- The Day 4 live frontier-model gate is not fully satisfied yet: no 20-episode
+  Prime Inference run has been completed, and the interrupted 2-rollout smoke
+  did not produce a saved output path.
+- `TRAFFIC_ADVISORY` and `PAYLOAD_ISSUE` remain cut per the Day 4 fallback.
+- Dynamic TFRs are enforced as geofence holds/procedure penalties; explicit
+  post-incursion hard-safety logging is still future work once route-through
+  authorization semantics are richer.
+
+Next action:
+- Re-run `vf-eval` with explicit endpoint config and a shorter generation cap
+  if needed, then inspect whether a T1 rollout contains a non-rulebook action.
+- If frontier rollouts remain boring, increase T1 decision density before
+  adding T2/T3 world scope.
+
 ## 2026-07-10 Day 3 wind + full console
 
 Changed:

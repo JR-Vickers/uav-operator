@@ -17,19 +17,19 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 3 implemented: five T0 scenarios, static Bay Area world
-  data, seeded wind with perturbations/gust fronts/altitude shear, calibrated
-  analytic energy, full SPEC §3.2 console tools, sim logging, and
-  autopilot-owned `LOW_BATT_RTL` / `GEOFENCE_HOLD` failsafes. Day 4 adds reward
-  v0, baselines, and first frontier-model contact.
+- **Status**: Day 4 implemented: seeded T0-T1 generator, event interrupts for
+  wind shift / pop-up TFR / battery degrade / site closure, full SPEC §5 reward
+  v0, rulebook and reckless baselines, deterministic sim logging, and the full
+  SPEC §3.2 console. T2/T3 generation and renderer remain next.
 
 ### Datasets
-- **Primary dataset(s)**: Seeded scenario generator, planned.
+- **Primary dataset(s)**: Seeded scenario generator emitting T0-T1 examples.
 - **Source links**: Static Day 2 world data is generated in-repo with
   `scripts/build_world.py` from simplified public-structure airspace and
   synthetic obstacle assumptions.
-- **Split sizes**: v0.1 target is at least 300 train and 60 eval scenarios,
-  stratified across T0-T3 difficulty tiers.
+- **Current split sizes**: default Day 4 eval set is 20 mixed T0-T1 examples.
+  v0.1 target remains at least 300 train and 60 eval scenarios, stratified
+  across T0-T3 difficulty tiers.
 
 ### Task
 - **Type**: Multi-turn tool use.
@@ -38,8 +38,8 @@ the model's prose.
   hold, resume, return to launch, land, release payload, abort missions, and
   override simulator-owned failsafes when justified by the scenario state.
 - **Rubric overview**: Mission value, hard safety violations, reserve and
-  margin policy, procedural compliance, and efficiency. Reward components are
-  derived only from simulator state and `sim_log`.
+  margin policy, procedural compliance, and efficiency. Reward components read
+  only saved `sim_log` snapshots; model prose is inert.
 
 ### Quickstart
 Run a small local smoke evaluation:
@@ -72,13 +72,15 @@ Notes:
   `uv run python scripts/build_world.py`.
 - Inspect the deterministic scripted rollout artifact at
   `assets/rollouts/day3_scripted_rollout.json`.
+- Run local baselines with
+  `uv run python scripts/baselines.py --policy both --episodes 20`.
 
 ### Taskset Config
 Planned fields:
 
 | Field | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
-| `tier` | string | `mixed` | Scenario tier selection: `T0`, `T1`, `T2`, `T3`, or `mixed`. |
+| `tier` | string | `mixed_day4` | Scenario tier selection: `T0`, `T1`, or mixed Day 4 T0/T1. |
 | `seed` | int | `0` | Base seed for deterministic scenario generation. |
 | `max_examples` | int | `-1` | Limit on dataset size; use `-1` for all generated examples. |
 | `wind_enabled` | bool | `true` | Enable seeded Day 3 wind field and altitude shear. |
@@ -93,7 +95,7 @@ Planned fields:
 | `sim_time_cap_min` | int | `90` | Maximum simulated episode duration. |
 
 ### Metrics
-Planned rubric metrics:
+Implemented rubric metrics:
 
 | Metric | Meaning |
 | ------ | ------- |
