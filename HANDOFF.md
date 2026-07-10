@@ -43,6 +43,13 @@ Troubleshooting update:
   as decimal strings in persisted sim state/logs, then converting them back to
   ints only when assigning to NumPy.
 - Added a msgpack regression test for saved `sim_state` / `sim_log` columns.
+- User reran live eval successfully:
+  `uv run vf-eval uav-operator -m poolside/laguna-m.1 -n 5 -r 1 --save-results --state-columns sim_state,sim_log`.
+  Output path `outputs/evals/uav-operator--poolside--laguna-m.1/6fee7f55`
+  had avg reward 0.8, avg turns 6.8, and avg error 0.0.
+- The single zero-reward rollout was a valid sim/training failure: low
+  commanded airspeed into strong headwind caused near-zero groundspeed,
+  battery depletion, and `LOW_BATT_RTL`; not a pipeline failure.
 
 ## 2026-07-10 Day 2 geography + energy
 
