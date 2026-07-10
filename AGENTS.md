@@ -76,6 +76,8 @@ this sentence to RL researchers, or (b) the 5-second visual proof of it.
 - Read SPEC.md before touching sim/env/reward code; read PLAN.md at session
   start to know today's gate; update HANDOFF.md at session end (what changed,
   what's broken, next action).
+- After meaningful changes, update README progress/status so it never lags the
+  implemented environment.
 - Ugliness discipline: until the Day 4 gate, prefer the ugliest implementation
   that produces real decisions. Polish is scheduled (Days 6–7, 12–13), not
   ambient.
