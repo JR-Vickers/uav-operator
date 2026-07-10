@@ -22,6 +22,13 @@ BATTERY_WH = 400.0
 DEFAULT_AIRSPEED_KT = 35.0
 TOOL_LATENCY_S = 20.0
 INVALID_ACTION_LATENCY_S = 30.0
+LOW_BATT_RTL_THRESHOLD_PCT = 30.0
+LOW_BATT_RTL_THRESHOLD_WH = BATTERY_WH * LOW_BATT_RTL_THRESHOLD_PCT / 100.0
+DEFAULT_WIND_DIR_FROM_DEG = 270.0
+DEFAULT_WIND_SPEED_KT = 0.0
+MIN_GROUNDSPEED_KT = 1.0
+
+AirspaceClass = Literal["B", "C", "D", "NO_FLY"]
 
 
 @dataclass(frozen=True)
@@ -32,6 +39,7 @@ class Site:
     name: str
     lat: float
     lon: float
+    kind: str = "recovery"
 
 
 @dataclass(frozen=True)
@@ -70,6 +78,31 @@ class Aircraft:
     current_site_id: str | None = None
 
 
+@dataclass(frozen=True)
+class AirspaceZone:
+    """Simplified static airspace or no-fly polygon."""
+
+    zone_id: str
+    name: str
+    polygon: tuple[tuple[float, float], ...]
+    floor_ft: float
+    ceiling_ft: float
+    airspace_class: AirspaceClass
+    authorization_required: bool = True
+
+
+@dataclass(frozen=True)
+class ObstacleCell:
+    """Coarse obstacle proxy cell."""
+
+    cell_id: str
+    lat_min: float
+    lat_max: float
+    lon_min: float
+    lon_max: float
+    elevation_ft: float
+
+
 @dataclass
 class SimState:
     """Serializable simulator state for one episode."""
@@ -82,6 +115,9 @@ class SimState:
     home_site_id: str
     current_plan: list[Waypoint] = field(default_factory=list)
     lost_link_plan: str = "return_home"
+    rng_draws: int = 0
+    active_failsafe: str | None = None
+    alerts: list[dict[str, Any]] = field(default_factory=list)
     last_action: str = "briefing"
     last_result: dict[str, Any] = field(default_factory=dict)
     is_terminal: bool = False
@@ -94,6 +130,123 @@ SITES: dict[str, Site] = {
     "san_mateo": Site("san_mateo", "San Mateo Bayfront", 37.5670, -122.3200),
     "berkeley": Site("berkeley", "Berkeley Marina Pad", 37.8646, -122.3130),
     "redwood": Site("redwood", "Redwood Shores Pad", 37.5530, -122.2580),
+    "daly_city": Site("daly_city", "Daly City Ridge Pad", 37.6879, -122.4702),
+    "oakland_port": Site("oakland_port", "Oakland Port Pad", 37.7955, -122.2856),
+    "hayward": Site("hayward", "Hayward Executive Pad", 37.6597, -122.1219),
+    "palo_alto": Site("palo_alto", "Palo Alto Baylands Pad", 37.5535, -122.1510),
+    "richmond": Site("richmond", "Richmond Harbor Pad", 37.9104, -122.3630),
+    "skyline": Site("skyline", "Skyline Ridge Recovery", 37.5520, -122.5010),
+    "fremont": Site("fremont", "Fremont Warm Springs Pad", 37.5550, -122.1510),
+}
+
+
+TARGET_POINTS: tuple[Waypoint, ...] = (
+    Waypoint(37.8230, -122.3710, "Treasure Island inspection point"),
+    Waypoint(37.8087, -122.4098, "Pier 39 delivery point"),
+    Waypoint(37.7350, -122.2390, "Bay Farm pump station"),
+    Waypoint(37.5908, -122.3257, "Coyote Point marker"),
+    Waypoint(37.9130, -122.3570, "Richmond Channel buoy"),
+    Waypoint(37.6152, -122.3899, "SFO perimeter sensor"),
+    Waypoint(37.7516, -122.2005, "Coliseum parking sensor"),
+    Waypoint(37.6890, -122.4010, "San Bruno ridge camera"),
+    Waypoint(37.8022, -122.4484, "Crissy Field shoreline marker"),
+    Waypoint(37.7793, -122.2455, "Alameda East dock"),
+)
+
+
+AIRSPACE_ZONES: tuple[AirspaceZone, ...] = (
+    AirspaceZone(
+        zone_id="sfo_b_core",
+        name="SFO Class B Core",
+        polygon=(
+            (37.5850, -122.4250),
+            (37.6500, -122.4250),
+            (37.6650, -122.3650),
+            (37.6200, -122.3350),
+            (37.5700, -122.3650),
+        ),
+        floor_ft=0.0,
+        ceiling_ft=3000.0,
+        airspace_class="B",
+    ),
+    AirspaceZone(
+        zone_id="sfo_b_north_shelf",
+        name="SFO Class B North Shelf",
+        polygon=(
+            (37.6500, -122.5000),
+            (37.7350, -122.5000),
+            (37.7350, -122.3600),
+            (37.6650, -122.3650),
+        ),
+        floor_ft=1500.0,
+        ceiling_ft=3000.0,
+        airspace_class="B",
+    ),
+    AirspaceZone(
+        zone_id="oak_c_core",
+        name="OAK Class C Core",
+        polygon=(
+            (37.6900, -122.2450),
+            (37.7600, -122.2450),
+            (37.7750, -122.1850),
+            (37.7150, -122.1550),
+            (37.6750, -122.1900),
+        ),
+        floor_ft=0.0,
+        ceiling_ft=2500.0,
+        airspace_class="C",
+        authorization_required=False,
+    ),
+    AirspaceZone(
+        zone_id="sql_d",
+        name="San Carlos Class D",
+        polygon=(
+            (37.4950, -122.2900),
+            (37.5550, -122.2900),
+            (37.5750, -122.2350),
+            (37.5300, -122.1900),
+            (37.4850, -122.2200),
+        ),
+        floor_ft=0.0,
+        ceiling_ft=2500.0,
+        airspace_class="D",
+        authorization_required=False,
+    ),
+    AirspaceZone(
+        zone_id="oakland_coliseum_no_fly",
+        name="Oakland Coliseum event no-fly polygon",
+        polygon=(
+            (37.7465, -122.2075),
+            (37.7570, -122.2075),
+            (37.7570, -122.1930),
+            (37.7465, -122.1930),
+        ),
+        floor_ft=0.0,
+        ceiling_ft=2000.0,
+        airspace_class="NO_FLY",
+    ),
+)
+
+
+OBSTACLE_CELLS: tuple[ObstacleCell, ...] = (
+    ObstacleCell("bay_flat", 37.55, 37.95, -122.60, -122.15, 40.0),
+    ObstacleCell("san_bruno_hills", 37.62, 37.72, -122.50, -122.40, 850.0),
+    ObstacleCell("oakland_hills", 37.76, 37.90, -122.25, -122.15, 1050.0),
+    ObstacleCell("san_mateo_ridge", 37.52, 37.62, -122.48, -122.34, 1200.0),
+)
+
+
+WORLD_DATA: dict[str, Any] = {
+    "bbox": {
+        "min_lat": MIN_LAT,
+        "max_lat": MAX_LAT,
+        "min_lon": MIN_LON,
+        "max_lon": MAX_LON,
+    },
+    "sites": [asdict(site) for site in SITES.values()],
+    "targets": [asdict(target) for target in TARGET_POINTS],
+    "airspace": [asdict(zone) for zone in AIRSPACE_ZONES],
+    "obstacle_cells": [asdict(cell) for cell in OBSTACLE_CELLS],
 }
 
 
@@ -141,7 +294,8 @@ SYSTEM_PROMPT = """You are the remote pilot in command for uav-operator.
 The simulator owns the aircraft, autopilot, energy model, and reward. Your job
 is operational judgment at decision points. Use tools to inspect telemetry,
 file a flight plan to the mission target, and command return-to-launch when the
-mission is complete. Day 1 scenarios have flat wind and no pop-up airspace.
+mission is complete. Current T0 scenarios have flat wind; the simulator still
+validates route geometry, energy, airspace, and autopilot failsafes.
 
 Reward comes only from simulator state: complete the mission value and bring
 the aircraft down. Natural-language claims do not score.
@@ -218,8 +372,111 @@ def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2.0 * EARTH_RADIUS_NM * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
 
+def bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Initial bearing from point 1 to point 2 in degrees true."""
+
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    d_lambda = math.radians(lon2 - lon1)
+    y = math.sin(d_lambda) * math.cos(phi2)
+    x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(d_lambda)
+    return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+
+
 def _in_bounds(lat: float, lon: float) -> bool:
     return MIN_LAT <= lat <= MAX_LAT and MIN_LON <= lon <= MAX_LON
+
+
+def _point_in_polygon(lat: float, lon: float, polygon: Sequence[tuple[float, float]]) -> bool:
+    inside = False
+    j = len(polygon) - 1
+    for i, point in enumerate(polygon):
+        lat_i, lon_i = point
+        lat_j, lon_j = polygon[j]
+        if (lon_i > lon) != (lon_j > lon):
+            slope_lat = (lat_j - lat_i) * (lon - lon_i) / (lon_j - lon_i) + lat_i
+            if lat < slope_lat:
+                inside = not inside
+        j = i
+    return inside
+
+
+def _orientation(a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> int:
+    value = (b[1] - a[1]) * (c[0] - b[0]) - (b[0] - a[0]) * (c[1] - b[1])
+    if abs(value) < 1e-12:
+        return 0
+    return 1 if value > 0.0 else 2
+
+
+def _on_segment(a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> bool:
+    return (
+        min(a[0], c[0]) <= b[0] <= max(a[0], c[0])
+        and min(a[1], c[1]) <= b[1] <= max(a[1], c[1])
+    )
+
+
+def _segments_intersect(
+    a1: tuple[float, float],
+    a2: tuple[float, float],
+    b1: tuple[float, float],
+    b2: tuple[float, float],
+) -> bool:
+    o1 = _orientation(a1, a2, b1)
+    o2 = _orientation(a1, a2, b2)
+    o3 = _orientation(b1, b2, a1)
+    o4 = _orientation(b1, b2, a2)
+
+    if o1 != o2 and o3 != o4:
+        return True
+    return (
+        (o1 == 0 and _on_segment(a1, b1, a2))
+        or (o2 == 0 and _on_segment(a1, b2, a2))
+        or (o3 == 0 and _on_segment(b1, a1, b2))
+        or (o4 == 0 and _on_segment(b1, a2, b2))
+    )
+
+
+def _route_crosses_polygon(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    polygon: Sequence[tuple[float, float]],
+) -> bool:
+    if _point_in_polygon(start[0], start[1], polygon) or _point_in_polygon(end[0], end[1], polygon):
+        return True
+    return any(
+        _segments_intersect(start, end, polygon[index], polygon[(index + 1) % len(polygon)])
+        for index in range(len(polygon))
+    )
+
+
+def _vertical_overlap(alt_ft: float, floor_ft: float, ceiling_ft: float) -> bool:
+    return floor_ft <= alt_ft <= ceiling_ft
+
+
+def _airspace_conflicts_for_segment(
+    start: Waypoint,
+    end: Waypoint,
+    alt_ft: float,
+) -> list[AirspaceZone]:
+    start_point = (start.lat, start.lon)
+    end_point = (end.lat, end.lon)
+    return [
+        zone
+        for zone in AIRSPACE_ZONES
+        if _vertical_overlap(alt_ft, zone.floor_ft, zone.ceiling_ft)
+        and _route_crosses_polygon(start_point, end_point, zone.polygon)
+    ]
+
+
+def min_safe_altitude_ft(lat: float, lon: float) -> float:
+    """Coarse terrain/structure clearance proxy in feet MSL."""
+
+    matching = [
+        cell.elevation_ft + 100.0
+        for cell in OBSTACLE_CELLS
+        if cell.lat_min <= lat <= cell.lat_max and cell.lon_min <= lon <= cell.lon_max
+    ]
+    return max(matching) if matching else 100.0
 
 
 def _nearest_site(lat: float, lon: float) -> Site:
@@ -272,7 +529,8 @@ def _scenario_briefing(scenario: dict[str, Any]) -> str:
         f"- Target: {target.name} at {target.lat:.4f}, {target.lon:.4f}\n"
         f"- SLA: complete within {float(scenario['sla_min']):.0f} simulated minutes\n"
         "- Weather: flat wind, 0 kt at all altitudes\n"
-        "- Airspace: no active restrictions in this Day 1 T0 scenario\n"
+        "- Airspace: no active pop-up restrictions in this T0 scenario; static "
+        "airspace/geofence checks still apply\n"
         "- Expected flow: query telemetry if needed, file a plan to the target, "
         "then command RTL after mission completion.\n"
     )
@@ -313,18 +571,67 @@ def _mission_distance_to_target(sim: SimState) -> float:
     )
 
 
+def _wind_component_along_track_kt(
+    wind_dir_from_deg: float,
+    wind_speed_kt: float,
+    track_deg: float,
+) -> float:
+    wind_to_deg = (wind_dir_from_deg + 180.0) % 360.0
+    angle = math.radians((wind_to_deg - track_deg + 540.0) % 360.0 - 180.0)
+    return wind_speed_kt * math.cos(angle)
+
+
+def _groundspeed_kt(
+    airspeed_kt: float,
+    track_deg: float,
+    wind_dir_from_deg: float = DEFAULT_WIND_DIR_FROM_DEG,
+    wind_speed_kt: float = DEFAULT_WIND_SPEED_KT,
+) -> float:
+    return airspeed_kt + _wind_component_along_track_kt(
+        wind_dir_from_deg=wind_dir_from_deg,
+        wind_speed_kt=wind_speed_kt,
+        track_deg=track_deg,
+    )
+
+
 def _segment_energy_wh(
     distance_nm: float,
     airspeed_kt: float,
     start_alt_ft: float,
     end_alt_ft: float,
     landing: bool = False,
+    *,
+    track_deg: float | None = None,
+    wind_dir_from_deg: float = DEFAULT_WIND_DIR_FROM_DEG,
+    wind_speed_kt: float = DEFAULT_WIND_SPEED_KT,
+    payload_kg: float = 0.0,
 ) -> float:
-    time_h = distance_nm / airspeed_kt if airspeed_kt > 0.0 else math.inf
-    cruise_power_w = 250.0 + 0.004 * airspeed_kt**3
-    climb_wh = max(0.0, end_alt_ft - start_alt_ft) * 0.002
+    if track_deg is None:
+        groundspeed_kt = airspeed_kt
+    else:
+        groundspeed_kt = _groundspeed_kt(
+            airspeed_kt=airspeed_kt,
+            track_deg=track_deg,
+            wind_dir_from_deg=wind_dir_from_deg,
+            wind_speed_kt=wind_speed_kt,
+        )
+    if groundspeed_kt <= MIN_GROUNDSPEED_KT:
+        return math.inf
+
+    time_h = distance_nm / groundspeed_kt if groundspeed_kt > 0.0 else math.inf
+    cruise_power_w = 180.0 + 0.0016 * airspeed_kt**3 + 22.0 * payload_kg
+    climb_wh = max(0.0, end_alt_ft - start_alt_ft) * 0.003
     landing_wh = BATTERY_WH * 0.08 if landing else 0.0
     return cruise_power_w * time_h + climb_wh + landing_wh
+
+
+def _execution_multiplier(sim: SimState) -> float:
+    rng = np.random.default_rng(sim.seed)
+    multiplier = 1.0
+    for _ in range(sim.rng_draws + 1):
+        multiplier = float(rng.normal(1.0, 0.03))
+    sim.rng_draws += 1
+    return min(1.10, max(0.90, multiplier))
 
 
 def _advance_segment(
@@ -339,14 +646,18 @@ def _advance_segment(
     start_lon = sim.aircraft.lon
     start_alt = sim.aircraft.alt_ft
     distance_nm = haversine_nm(start_lat, start_lon, waypoint.lat, waypoint.lon)
-    duration_s = (distance_nm / airspeed_kt) * 3600.0
+    track_deg = bearing_deg(start_lat, start_lon, waypoint.lat, waypoint.lon)
+    groundspeed_kt = _groundspeed_kt(airspeed_kt=airspeed_kt, track_deg=track_deg)
+    multiplier = _execution_multiplier(sim)
+    duration_s = (distance_nm / groundspeed_kt) * 3600.0 * multiplier
     energy_wh = _segment_energy_wh(
         distance_nm=distance_nm,
         airspeed_kt=airspeed_kt,
         start_alt_ft=start_alt,
         end_alt_ft=0.0 if landing else alt_ft,
         landing=landing,
-    )
+        track_deg=track_deg,
+    ) * multiplier
 
     sim.sim_time_s += duration_s
     sim.aircraft.battery_wh -= energy_wh
@@ -366,6 +677,9 @@ def _advance_segment(
         "from": {"lat": start_lat, "lon": start_lon, "alt_ft": start_alt},
         "to": {"lat": waypoint.lat, "lon": waypoint.lon, "alt_ft": sim.aircraft.alt_ft},
         "distance_nm": round(distance_nm, 3),
+        "track_deg": round(track_deg, 1),
+        "groundspeed_kt": round(groundspeed_kt, 2),
+        "execution_multiplier": round(multiplier, 4),
         "duration_s": round(duration_s, 1),
         "energy_wh": round(energy_wh, 2),
     }
@@ -377,6 +691,27 @@ def _snapshot(sim: SimState, event: str) -> dict[str, Any]:
     data["battery_pct"] = round(100.0 * sim.aircraft.battery_wh / BATTERY_WH, 2)
     data["mission_distance_to_target_nm"] = round(_mission_distance_to_target(sim), 3)
     return data
+
+
+def _last_result_summary(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Compact previous tool result for telemetry without recursive payloads."""
+
+    summary: dict[str, Any] = {}
+    for key in ("ok", "error", "warnings", "errors", "active_failsafe", "landing_site"):
+        if key in result:
+            summary[key] = result[key]
+    if "segments" in result and isinstance(result["segments"], Sequence):
+        summary["segment_count"] = len(result["segments"])
+    if "segment" in result and isinstance(result["segment"], Mapping):
+        segment = cast(Mapping[str, Any], result["segment"])
+        summary["segment"] = {
+            key: segment[key]
+            for key in ("distance_nm", "duration_s", "energy_wh")
+            if key in segment
+        }
+    if "conflicts" in result and isinstance(result["conflicts"], Sequence):
+        summary["conflict_count"] = len(result["conflicts"])
+    return summary
 
 
 def _telemetry(sim: SimState) -> dict[str, Any]:
@@ -404,8 +739,129 @@ def _telemetry(sim: SimState) -> dict[str, Any]:
             ),
         },
         "weather": {"wind_dir_deg_from": 0, "wind_speed_kt": 0},
+        "active_failsafe": sim.active_failsafe,
+        "alerts": sim.alerts,
         "last_action": sim.last_action,
-        "last_result": sim.last_result,
+        "last_result_summary": _last_result_summary(sim.last_result),
+    }
+
+
+def _append_alert(
+    sim: SimState,
+    alert_id: str,
+    message: str,
+    metadata: Mapping[str, Any] | None = None,
+) -> None:
+    sim.alerts.append(
+        {
+            "alert_id": alert_id,
+            "sim_time_s": round(sim.sim_time_s, 1),
+            "message": message,
+            "metadata": dict(metadata or {}),
+        }
+    )
+
+
+def _route_validation(
+    sim: SimState,
+    waypoints: Sequence[Waypoint],
+    alt_ft: float,
+    airspeed_kt: float,
+) -> tuple[list[str], list[str], list[AirspaceZone]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    geofence_conflicts: list[AirspaceZone] = []
+
+    if not 100.0 <= alt_ft <= 400.0:
+        errors.append("altitude_outside_day2_policy_100_400_ft")
+    if not 20.0 <= airspeed_kt <= 45.0:
+        errors.append("airspeed_outside_airframe_envelope_20_45_kt")
+    if any(not _in_bounds(wp.lat, wp.lon) for wp in waypoints):
+        errors.append("route_leaves_san_francisco_bay_area_box")
+
+    start = Waypoint(sim.aircraft.lat, sim.aircraft.lon, "current_position")
+    for waypoint in waypoints:
+        track_deg = bearing_deg(start.lat, start.lon, waypoint.lat, waypoint.lon)
+        if _groundspeed_kt(airspeed_kt=airspeed_kt, track_deg=track_deg) <= MIN_GROUNDSPEED_KT:
+            errors.append("segment_infeasible_groundspeed")
+
+        safe_alt_ft = max(
+            min_safe_altitude_ft(start.lat, start.lon),
+            min_safe_altitude_ft(waypoint.lat, waypoint.lon),
+        )
+        if alt_ft < safe_alt_ft:
+            warnings.append(f"min_safe_altitude_violation:{safe_alt_ft:.0f}ft_required")
+
+        for zone in _airspace_conflicts_for_segment(start, waypoint, alt_ft):
+            if zone.authorization_required:
+                geofence_conflicts.append(zone)
+            else:
+                warnings.append(f"airspace_advisory:{zone.zone_id}")
+        start = waypoint
+
+    dedup_errors = list(dict.fromkeys(errors))
+    dedup_warnings = list(dict.fromkeys(warnings))
+    dedup_geofence = list({zone.zone_id: zone for zone in geofence_conflicts}.values())
+    return dedup_errors, dedup_warnings, dedup_geofence
+
+
+def _trigger_geofence_hold(sim: SimState, zones: Sequence[AirspaceZone]) -> dict[str, Any]:
+    sim.active_failsafe = "GEOFENCE_HOLD"
+    if sim.aircraft.status == "airborne":
+        sim.aircraft.status = "holding"
+    zone_payload = [
+        {
+            "zone_id": zone.zone_id,
+            "name": zone.name,
+            "floor_ft": zone.floor_ft,
+            "ceiling_ft": zone.ceiling_ft,
+            "class": zone.airspace_class,
+        }
+        for zone in zones
+    ]
+    _append_alert(
+        sim,
+        "GEOFENCE_HOLD",
+        "Predicted unauthorized airspace incursion; autopilot holding before entry.",
+        {"zones": zone_payload},
+    )
+    return {
+        "ok": False,
+        "error": "failsafe:GEOFENCE_HOLD",
+        "active_failsafe": sim.active_failsafe,
+        "conflicts": zone_payload,
+        "telemetry": _telemetry(sim),
+    }
+
+
+def _trigger_low_batt_rtl(sim: SimState) -> dict[str, Any]:
+    sim.active_failsafe = "LOW_BATT_RTL"
+    site = _nearest_site(sim.aircraft.lat, sim.aircraft.lon)
+    _append_alert(
+        sim,
+        "LOW_BATT_RTL",
+        "Battery at or below 30%; autopilot returning to nearest recovery site.",
+        {
+            "battery_pct": round(100.0 * sim.aircraft.battery_wh / BATTERY_WH, 2),
+            "site_id": site.site_id,
+        },
+    )
+    segment = _advance_segment(
+        sim=sim,
+        waypoint=Waypoint(site.lat, site.lon, site.name),
+        alt_ft=max(sim.aircraft.alt_ft, 250.0),
+        airspeed_kt=DEFAULT_AIRSPEED_KT,
+        landing=True,
+    )
+    sim.aircraft.current_site_id = site.site_id
+    if sim.mission.status == "pending" and sim.aircraft.status != "lost":
+        sim.mission.status = "failed"
+        sim.mission.failure_reason = "low_batt_rtl_before_mission_completion"
+    _mark_terminal_if_done(sim)
+    return {
+        "active_failsafe": sim.active_failsafe,
+        "landing_site": asdict(site),
+        "segment": segment,
     }
 
 
@@ -430,7 +886,6 @@ def _execute_get_telemetry(sim: SimState, _args: Mapping[str, Any]) -> dict[str,
 
 def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
     sim.sim_time_s += TOOL_LATENCY_S
-    warnings: list[str] = []
 
     try:
         raw_waypoints = args["waypoints"]
@@ -456,18 +911,24 @@ def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[st
             "error": f"cannot_file_plan_from_status:{sim.aircraft.status}",
         }
         return sim.last_result
-    if not 100.0 <= alt_ft <= 400.0:
-        warnings.append("altitude_outside_day1_policy_100_400_ft")
-    if not 20.0 <= airspeed_kt <= 45.0:
-        warnings.append("airspeed_outside_airframe_envelope_20_45_kt")
-    if any(not _in_bounds(wp.lat, wp.lon) for wp in waypoints):
-        warnings.append("route_leaves_san_francisco_bay_area_box")
-    if warnings:
+
+    errors, warnings, geofence_conflicts = _route_validation(
+        sim=sim,
+        waypoints=waypoints,
+        alt_ft=alt_ft,
+        airspeed_kt=airspeed_kt,
+    )
+    if errors:
         sim.sim_time_s += INVALID_ACTION_LATENCY_S
         sim.last_action = "file_flight_plan"
-        sim.last_result = {"ok": False, "warnings": warnings}
+        sim.last_result = {"ok": False, "errors": errors, "warnings": warnings}
+        return sim.last_result
+    if geofence_conflicts:
+        sim.last_action = "file_flight_plan"
+        sim.last_result = _trigger_geofence_hold(sim, geofence_conflicts)
         return sim.last_result
 
+    sim.active_failsafe = None
     sim.aircraft.status = "airborne"
     sim.aircraft.current_site_id = None
     sim.current_plan = waypoints
@@ -484,10 +945,12 @@ def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[st
         )
         if sim.is_terminal:
             break
-
-    if sim.mission.status == "pending" and _mission_distance_to_target(sim) <= 0.2:
-        sim.mission.status = "completed"
-        sim.mission.completed_time_s = sim.sim_time_s
+        if sim.mission.status == "pending" and _mission_distance_to_target(sim) <= 0.2:
+            sim.mission.status = "completed"
+            sim.mission.completed_time_s = sim.sim_time_s
+        if sim.aircraft.battery_wh <= LOW_BATT_RTL_THRESHOLD_WH:
+            segments.append({"failsafe": _trigger_low_batt_rtl(sim)})
+            break
 
     sim.last_action = "file_flight_plan"
     sim.last_result = {
@@ -519,6 +982,7 @@ def _execute_command_rtl(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
         _mark_terminal_if_done(sim)
         return sim.last_result
 
+    sim.active_failsafe = None
     target = Waypoint(site.lat, site.lon, site.name)
     segment = _advance_segment(
         sim=sim,
@@ -598,6 +1062,9 @@ def _state_sim(state: vf.State) -> SimState:
             Waypoint(**waypoint) for waypoint in state["sim_state"].get("current_plan", [])
         ],
         lost_link_plan=str(state["sim_state"].get("lost_link_plan", "return_home")),
+        rng_draws=int(state["sim_state"].get("rng_draws", 0)),
+        active_failsafe=state["sim_state"].get("active_failsafe"),
+        alerts=list(state["sim_state"].get("alerts", [])),
         last_action=str(state["sim_state"].get("last_action", "briefing")),
         last_result=dict(state["sim_state"].get("last_result", {})),
         is_terminal=bool(state["sim_state"].get("is_terminal", False)),

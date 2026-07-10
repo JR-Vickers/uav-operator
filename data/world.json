@@ -1,0 +1,324 @@
+{
+  "airspace": [
+    {
+      "airspace_class": "B",
+      "authorization_required": true,
+      "ceiling_ft": 3000.0,
+      "floor_ft": 0.0,
+      "name": "SFO Class B Core",
+      "polygon": [
+        [
+          37.585,
+          -122.425
+        ],
+        [
+          37.65,
+          -122.425
+        ],
+        [
+          37.665,
+          -122.365
+        ],
+        [
+          37.62,
+          -122.335
+        ],
+        [
+          37.57,
+          -122.365
+        ]
+      ],
+      "zone_id": "sfo_b_core"
+    },
+    {
+      "airspace_class": "B",
+      "authorization_required": true,
+      "ceiling_ft": 3000.0,
+      "floor_ft": 1500.0,
+      "name": "SFO Class B North Shelf",
+      "polygon": [
+        [
+          37.65,
+          -122.5
+        ],
+        [
+          37.735,
+          -122.5
+        ],
+        [
+          37.735,
+          -122.36
+        ],
+        [
+          37.665,
+          -122.365
+        ]
+      ],
+      "zone_id": "sfo_b_north_shelf"
+    },
+    {
+      "airspace_class": "C",
+      "authorization_required": false,
+      "ceiling_ft": 2500.0,
+      "floor_ft": 0.0,
+      "name": "OAK Class C Core",
+      "polygon": [
+        [
+          37.69,
+          -122.245
+        ],
+        [
+          37.76,
+          -122.245
+        ],
+        [
+          37.775,
+          -122.185
+        ],
+        [
+          37.715,
+          -122.155
+        ],
+        [
+          37.675,
+          -122.19
+        ]
+      ],
+      "zone_id": "oak_c_core"
+    },
+    {
+      "airspace_class": "D",
+      "authorization_required": false,
+      "ceiling_ft": 2500.0,
+      "floor_ft": 0.0,
+      "name": "San Carlos Class D",
+      "polygon": [
+        [
+          37.495,
+          -122.29
+        ],
+        [
+          37.555,
+          -122.29
+        ],
+        [
+          37.575,
+          -122.235
+        ],
+        [
+          37.53,
+          -122.19
+        ],
+        [
+          37.485,
+          -122.22
+        ]
+      ],
+      "zone_id": "sql_d"
+    },
+    {
+      "airspace_class": "NO_FLY",
+      "authorization_required": true,
+      "ceiling_ft": 2000.0,
+      "floor_ft": 0.0,
+      "name": "Oakland Coliseum event no-fly polygon",
+      "polygon": [
+        [
+          37.7465,
+          -122.2075
+        ],
+        [
+          37.757,
+          -122.2075
+        ],
+        [
+          37.757,
+          -122.193
+        ],
+        [
+          37.7465,
+          -122.193
+        ]
+      ],
+      "zone_id": "oakland_coliseum_no_fly"
+    }
+  ],
+  "bbox": {
+    "max_lat": 37.95,
+    "max_lon": -122.15,
+    "min_lat": 37.55,
+    "min_lon": -122.6
+  },
+  "obstacle_cells": [
+    {
+      "cell_id": "bay_flat",
+      "elevation_ft": 40.0,
+      "lat_max": 37.95,
+      "lat_min": 37.55,
+      "lon_max": -122.15,
+      "lon_min": -122.6
+    },
+    {
+      "cell_id": "san_bruno_hills",
+      "elevation_ft": 850.0,
+      "lat_max": 37.72,
+      "lat_min": 37.62,
+      "lon_max": -122.4,
+      "lon_min": -122.5
+    },
+    {
+      "cell_id": "oakland_hills",
+      "elevation_ft": 1050.0,
+      "lat_max": 37.9,
+      "lat_min": 37.76,
+      "lon_max": -122.15,
+      "lon_min": -122.25
+    },
+    {
+      "cell_id": "san_mateo_ridge",
+      "elevation_ft": 1200.0,
+      "lat_max": 37.62,
+      "lat_min": 37.52,
+      "lon_max": -122.34,
+      "lon_min": -122.48
+    }
+  ],
+  "sites": [
+    {
+      "kind": "recovery",
+      "lat": 37.7707,
+      "lon": -122.3869,
+      "name": "Mission Bay Pad",
+      "site_id": "mission_bay"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.7866,
+      "lon": -122.308,
+      "name": "Alameda Depot",
+      "site_id": "alameda"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.567,
+      "lon": -122.32,
+      "name": "San Mateo Bayfront",
+      "site_id": "san_mateo"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.8646,
+      "lon": -122.313,
+      "name": "Berkeley Marina Pad",
+      "site_id": "berkeley"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.553,
+      "lon": -122.258,
+      "name": "Redwood Shores Pad",
+      "site_id": "redwood"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.6879,
+      "lon": -122.4702,
+      "name": "Daly City Ridge Pad",
+      "site_id": "daly_city"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.7955,
+      "lon": -122.2856,
+      "name": "Oakland Port Pad",
+      "site_id": "oakland_port"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.6597,
+      "lon": -122.1219,
+      "name": "Hayward Executive Pad",
+      "site_id": "hayward"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.5535,
+      "lon": -122.151,
+      "name": "Palo Alto Baylands Pad",
+      "site_id": "palo_alto"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.9104,
+      "lon": -122.363,
+      "name": "Richmond Harbor Pad",
+      "site_id": "richmond"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.552,
+      "lon": -122.501,
+      "name": "Skyline Ridge Recovery",
+      "site_id": "skyline"
+    },
+    {
+      "kind": "recovery",
+      "lat": 37.555,
+      "lon": -122.151,
+      "name": "Fremont Warm Springs Pad",
+      "site_id": "fremont"
+    }
+  ],
+  "targets": [
+    {
+      "lat": 37.823,
+      "lon": -122.371,
+      "name": "Treasure Island inspection point"
+    },
+    {
+      "lat": 37.8087,
+      "lon": -122.4098,
+      "name": "Pier 39 delivery point"
+    },
+    {
+      "lat": 37.735,
+      "lon": -122.239,
+      "name": "Bay Farm pump station"
+    },
+    {
+      "lat": 37.5908,
+      "lon": -122.3257,
+      "name": "Coyote Point marker"
+    },
+    {
+      "lat": 37.913,
+      "lon": -122.357,
+      "name": "Richmond Channel buoy"
+    },
+    {
+      "lat": 37.6152,
+      "lon": -122.3899,
+      "name": "SFO perimeter sensor"
+    },
+    {
+      "lat": 37.7516,
+      "lon": -122.2005,
+      "name": "Coliseum parking sensor"
+    },
+    {
+      "lat": 37.689,
+      "lon": -122.401,
+      "name": "San Bruno ridge camera"
+    },
+    {
+      "lat": 37.8022,
+      "lon": -122.4484,
+      "name": "Crissy Field shoreline marker"
+    },
+    {
+      "lat": 37.7793,
+      "lon": -122.2455,
+      "name": "Alameda East dock"
+    }
+  ]
+}

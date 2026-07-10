@@ -1,5 +1,42 @@
 # HANDOFF.md
 
+## 2026-07-10 Day 2 geography + energy
+
+Changed:
+- Added embedded static Bay Area world data in `uav_operator.py`: expanded
+  recovery sites, target points, simplified airspace polygons, and coarse
+  obstacle cells.
+- Added `scripts/build_world.py` and generated `data/world.json` for dev and
+  renderer inspection while keeping the runtime wheel lean.
+- Added bearing, polygon/route intersection, min-safe-altitude, wind-component,
+  groundspeed, and calibrated energy helpers.
+- Replaced Day 1 segment execution with deterministic analytic segment metrics
+  including groundspeed, energy, and seeded execution multipliers.
+- Added route validation for bounds/envelope errors, min-safe-alt warnings,
+  airspace advisories, and unauthorized-airspace prediction.
+- Implemented simulator-owned `GEOFENCE_HOLD` and `LOW_BATT_RTL` failsafes
+  with structured alerts logged into `sim_state` / `sim_log`.
+- Updated tests for Day 2 geometry, energy calibration, geofence hold,
+  low-battery RTL, and deterministic replay.
+- Updated `README.md` status and static-world note.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run --with pytest pytest -q` passes: 7 tests.
+
+Broken / not done:
+- Plain `uv run pytest -q` does not work because `pytest` is not installed in
+  the base uv environment; use `uv run --with pytest pytest -q`.
+- I did not run live `vf-eval uav-operator -m <model> -n 2 -r 1`; it still
+  depends on configured model/provider credentials.
+- Day 3 scope remains open: seeded wind field, full console tool set,
+  sim-time tool costs across new tools, and determinism CI expansion.
+
+Next action:
+- Implement PLAN.md Day 3: seeded wind perturbations/gust front, altitude
+  shear, the full SPEC §3.2 operator console, validation warnings, and the
+  formal determinism CI test.
+
 ## 2026-07-10 docs quality bar
 
 Changed:

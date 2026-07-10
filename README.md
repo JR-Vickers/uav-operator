@@ -17,15 +17,16 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 1 harness implemented: five T0 scenarios, three tools,
-  straight-line analytic autopilot, mission-value reward, and sim logging.
-  Day 2+ adds geography, energy calibration, wind, failsafes, and richer
-  rewards.
+- **Status**: Day 2 implemented: five T0 scenarios, three tools, static Bay
+  Area world data, route geometry checks, calibrated analytic energy, sim
+  logging, and autopilot-owned `LOW_BATT_RTL` / `GEOFENCE_HOLD` failsafes.
+  Day 3+ adds seeded wind, the full console, richer events, and reward v0.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator, planned.
-- **Source links**: Generated in-repo from public-structure airspace and
-  synthetic weather assumptions.
+- **Source links**: Static Day 2 world data is generated in-repo with
+  `scripts/build_world.py` from simplified public-structure airspace and
+  synthetic obstacle assumptions.
 - **Split sizes**: v0.1 target is at least 300 train and 60 eval scenarios,
   stratified across T0-T3 difficulty tiers.
 
@@ -66,6 +67,8 @@ Notes:
   under `[env.harness]` in TOML configs.
 - The core sim is event-driven and analytic. It tests supervisory operator
   judgment, not low-level flight control or 3D collision physics.
+- Inspect or rebuild the static Day 2 world JSON with
+  `uv run python scripts/build_world.py`.
 
 ### Taskset Config
 Planned fields:

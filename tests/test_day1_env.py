@@ -101,9 +101,108 @@ def test_invalid_action_costs_time_without_crashing() -> None:
 
     result = json.loads(response[0].content)
     assert result["ok"] is False
-    assert "route_leaves_san_francisco_bay_area_box" in result["warnings"]
+    assert "route_leaves_san_francisco_bay_area_box" in result["errors"]
     assert state["sim_state"]["sim_time_s"] == start_time + uav_operator.TOOL_LATENCY_S + uav_operator.INVALID_ACTION_LATENCY_S
     assert state["sim_state"]["is_terminal"] is False
+
+
+def test_day2_geometry_and_energy_invariants() -> None:
+    box_crossing_nm = uav_operator.haversine_nm(
+        37.75,
+        uav_operator.MIN_LON,
+        37.75,
+        uav_operator.MAX_LON,
+    )
+
+    assert 20.0 < box_crossing_nm < 22.0
+    assert 80.0 < uav_operator.bearing_deg(37.75, -122.60, 37.75, -122.15) < 100.0
+    assert uav_operator._groundspeed_kt(
+        airspeed_kt=35.0,
+        track_deg=90.0,
+        wind_dir_from_deg=90.0,
+        wind_speed_kt=20.0,
+    ) == 15.0
+
+    level_energy = uav_operator._segment_energy_wh(
+        distance_nm=5.0,
+        airspeed_kt=35.0,
+        start_alt_ft=250.0,
+        end_alt_ft=250.0,
+    )
+    climb_energy = uav_operator._segment_energy_wh(
+        distance_nm=5.0,
+        airspeed_kt=35.0,
+        start_alt_ft=0.0,
+        end_alt_ft=400.0,
+    )
+    fast_energy = uav_operator._segment_energy_wh(
+        distance_nm=5.0,
+        airspeed_kt=45.0,
+        start_alt_ft=250.0,
+        end_alt_ft=250.0,
+    )
+    marginal_energy = uav_operator._segment_energy_wh(
+        distance_nm=box_crossing_nm,
+        airspeed_kt=35.0,
+        start_alt_ft=0.0,
+        end_alt_ft=250.0,
+        track_deg=90.0,
+        wind_dir_from_deg=90.0,
+        wind_speed_kt=20.0,
+    )
+
+    assert climb_energy > level_energy
+    assert fast_energy > level_energy
+    assert 0.75 * uav_operator.BATTERY_WH < marginal_energy < uav_operator.BATTERY_WH
+
+
+def test_day2_geofence_hold_blocks_predicted_unauthorized_airspace() -> None:
+    env, state = _setup_state(seed=9, scenario_index=3)
+    start_position = dict(state["sim_state"]["aircraft"])
+
+    response = _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [{"lat": 37.62, "lon": -122.39, "name": "SFO core test"}],
+            "alt_ft": 250,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+
+    result = json.loads(response[0].content)
+    assert result["ok"] is False
+    assert result["error"] == "failsafe:GEOFENCE_HOLD"
+    assert state["sim_state"]["active_failsafe"] == "GEOFENCE_HOLD"
+    assert state["sim_state"]["alerts"][-1]["alert_id"] == "GEOFENCE_HOLD"
+    assert state["sim_state"]["aircraft"]["lat"] == start_position["lat"]
+    assert state["sim_state"]["aircraft"]["lon"] == start_position["lon"]
+
+
+def test_day2_low_battery_triggers_autonomous_rtl() -> None:
+    env, state = _setup_state(seed=11, scenario_index=0)
+    state["sim_state"]["aircraft"]["battery_wh"] = uav_operator.LOW_BATT_RTL_THRESHOLD_WH + 1.0
+    target = state["sim_state"]["mission"]["target"]
+
+    _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [target],
+            "alt_ft": 250,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+
+    assert state["sim_state"]["active_failsafe"] == "LOW_BATT_RTL"
+    assert state["sim_state"]["alerts"][-1]["alert_id"] == "LOW_BATT_RTL"
+    assert state["sim_state"]["aircraft"]["status"] == "landed"
+    assert state["sim_state"]["is_terminal"] is True
+    assert state["sim_state"]["terminal_reason"] == "aircraft_landed_mission_completed"
 
 
 def test_same_seed_and_action_sequence_are_deterministic() -> None:
