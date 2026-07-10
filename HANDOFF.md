@@ -1,5 +1,23 @@
 # HANDOFF.md
 
+## 2026-07-10 docs quality bar
+
+Changed:
+- Added a concise professional-environment quality bar to `SPEC.md`.
+- Refreshed `README.md` so it reflects the implemented Day 1 harness and the
+  current model-eval smoke command.
+- Clarified in README that the core sim is event-driven and analytic, not a 3D
+  drone simulator.
+
+Verified:
+- Documentation-only change; checked the edited sections with `sed`.
+
+Broken / not done:
+- No code changes in this pass.
+
+Next action:
+- Keep Day 2 implementation aligned with the new SPEC quality bar.
+
 ## 2026-07-10
 
 Changed:

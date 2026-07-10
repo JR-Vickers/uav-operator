@@ -17,9 +17,10 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Build skeleton. The package metadata and import path are in
-  place; the Day 1 end-to-end environment loop is the next implementation
-  target.
+- **Status**: Day 1 harness implemented: five T0 scenarios, three tools,
+  straight-line analytic autopilot, mission-value reward, and sim logging.
+  Day 2+ adds geography, energy calibration, wind, failsafes, and richer
+  rewards.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator, planned.
@@ -39,24 +40,32 @@ the model's prose.
   derived only from simulator state and `sim_log`.
 
 ### Quickstart
-Once the Day 1 environment skeleton is implemented, run an evaluation with
-default settings:
+Run a small local smoke evaluation:
 
 ```bash
-prime eval run uav-operator
+prime --plain eval run uav-operator -n 2 -r 1 --skip-upload --disable-tui
 ```
 
-Configure model and sampling:
+Configure model, sampling, and saved simulator state:
 
 ```bash
-prime eval run uav-operator -m openai/gpt-4.1-mini -n 20 -r 3 -t 1024 -T 0.7
+prime --plain eval run uav-operator \
+  -m poolside/laguna-m.1 \
+  -n 5 \
+  -r 1 \
+  -t 512 \
+  -T 0.2 \
+  --skip-upload \
+  --disable-tui \
+  --save-results \
+  --state-columns sim_state,sim_log
 ```
 
 Notes:
 - Put task-owned settings under `[env.taskset]` and harness-owned settings
   under `[env.harness]` in TOML configs.
-- Until the Day 1 loop is implemented, `load_environment()` intentionally
-  raises `NotImplementedError`.
+- The core sim is event-driven and analytic. It tests supervisory operator
+  judgment, not low-level flight control or 3D collision physics.
 
 ### Taskset Config
 Planned fields:

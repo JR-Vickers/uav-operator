@@ -22,6 +22,19 @@ An episode = one operational window (sim duration 20–90 min) containing 1–3
 missions and 0–5 events, ending when all missions are resolved and the
 aircraft is on the ground (or lost).
 
+### 1.1 Professional environment bar
+
+This is only a serious RL environment if it clears these checks by v0.1:
+- T0–T3 scenarios exist, with T0 as harness sanity and T2/T3 as the real task.
+- Scenarios come from a seeded generator, not only memorized hand examples.
+- Conservative rulebook, reckless, and simple scripted baselines are reported.
+- Difficulty separates by tier: T0 near ceiling, T3 visibly below ceiling.
+- `docs/HACKS.md` contains closed reward-hacking attempts with regressions.
+- `(seed, action_sequence)` replays to the same `sim_log`.
+- Every rollout can be rendered offline from saved `sim_log` alone.
+- The docs state the abstraction honestly: supervisory ops judgment, not
+  low-level flight control or a 3D drone simulator.
+
 ## 2. World model
 
 ### 2.1 Static geography (built once, bundled as JSON ≤200KB)
