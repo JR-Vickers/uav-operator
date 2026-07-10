@@ -21,12 +21,22 @@ EARTH_RADIUS_NM = 3440.065
 BATTERY_WH = 400.0
 DEFAULT_AIRSPEED_KT = 35.0
 TOOL_LATENCY_S = 20.0
+READ_TOOL_LATENCY_S = 10.0
+HIGH_IMPACT_TOOL_LATENCY_S = 30.0
 INVALID_ACTION_LATENCY_S = 30.0
 LOW_BATT_RTL_THRESHOLD_PCT = 30.0
 LOW_BATT_RTL_THRESHOLD_WH = BATTERY_WH * LOW_BATT_RTL_THRESHOLD_PCT / 100.0
 DEFAULT_WIND_DIR_FROM_DEG = 270.0
 DEFAULT_WIND_SPEED_KT = 0.0
 MIN_GROUNDSPEED_KT = 1.0
+WIND_ALT_SPEED_SCALE_PER_1000_FT = 0.15
+WIND_ALT_VEER_DEG_PER_1000_FT = 5.0
+VALID_OVERRIDE_JUSTIFICATIONS = {
+    "MISSION_CRITICAL_MARGIN_OK",
+    "SAFE_LANDING_ASSURED",
+    "AIRSPACE_AUTH_CONFIRMED",
+    "RECOVERY_SITE_ASSURED",
+}
 
 AirspaceClass = Literal["B", "C", "D", "NO_FLY"]
 
@@ -103,6 +113,44 @@ class ObstacleCell:
     elevation_ft: float
 
 
+@dataclass(frozen=True)
+class WindBlob:
+    """Smooth seeded wind perturbation."""
+
+    center_lat: float
+    center_lon: float
+    radius_nm: float
+    dir_delta_deg: float
+    speed_delta_kt: float
+    drift_bearing_deg: float
+    drift_speed_kt: float
+
+
+@dataclass(frozen=True)
+class GustFront:
+    """Seeded moving gust-front line."""
+
+    anchor_lat: float
+    anchor_lon: float
+    orientation_deg: float
+    movement_bearing_deg: float
+    speed_kt: float
+    dir_shift_deg: float
+    speed_delta_kt: float
+    forecast_eta_s: float
+    eta_error_s: float
+
+
+@dataclass(frozen=True)
+class WindField:
+    """Serializable per-episode wind configuration."""
+
+    base_dir_deg_from: float
+    base_speed_kt: float
+    blobs: list[WindBlob]
+    gust_front: GustFront | None = None
+
+
 @dataclass
 class SimState:
     """Serializable simulator state for one episode."""
@@ -113,11 +161,19 @@ class SimState:
     aircraft: Aircraft
     mission: Mission
     home_site_id: str
+    wind: WindField
+    rng_state: dict[str, Any]
     current_plan: list[Waypoint] = field(default_factory=list)
     lost_link_plan: str = "return_home"
     rng_draws: int = 0
     active_failsafe: str | None = None
     alerts: list[dict[str, Any]] = field(default_factory=list)
+    acknowledged_alerts: list[str] = field(default_factory=list)
+    overrides: list[dict[str, Any]] = field(default_factory=list)
+    payload_released: bool = False
+    hold_until_s: float | None = None
+    current_altitude_target_ft: float = 250.0
+    current_airspeed_kt: float = DEFAULT_AIRSPEED_KT
     last_action: str = "briefing"
     last_result: dict[str, Any] = field(default_factory=dict)
     is_terminal: bool = False
@@ -293,9 +349,12 @@ SYSTEM_PROMPT = """You are the remote pilot in command for uav-operator.
 
 The simulator owns the aircraft, autopilot, energy model, and reward. Your job
 is operational judgment at decision points. Use tools to inspect telemetry,
-file a flight plan to the mission target, and command return-to-launch when the
-mission is complete. Current T0 scenarios have flat wind; the simulator still
-validates route geometry, energy, airspace, and autopilot failsafes.
+weather, airspace, sites, and mission status; then file or amend plans, hold,
+return, land, release payloads, abort, acknowledge alerts, or override active
+failsafes only when the enum justification is supported by the sim state.
+Wind is seeded, spatially varying, altitude-dependent, and may include a gust
+front forecast with error. The simulator validates route geometry, energy,
+airspace, and autopilot failsafes.
 
 Reward comes only from simulator state: complete the mission value and bring
 the aircraft down. Natural-language claims do not score.
@@ -303,10 +362,68 @@ the aircraft down. Natural-language claims do not score.
 
 
 def _tool_defs() -> list[dict[str, Any]]:
+    waypoint_schema = {
+        "type": "object",
+        "properties": {
+            "lat": {"type": "number"},
+            "lon": {"type": "number"},
+            "name": {"type": "string"},
+        },
+        "required": ["lat", "lon"],
+        "additionalProperties": False,
+    }
+    waypoints_schema = {
+        "type": "array",
+        "minItems": 1,
+        "items": waypoint_schema,
+    }
     return [
         {
             "name": "get_telemetry",
-            "description": "Return current aircraft, mission, and flat-weather telemetry.",
+            "description": "Return current aircraft, mission, weather, alerts, and active failsafe telemetry.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "get_weather",
+            "description": "Return current wind and coarse gust-front forecast at a location.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lat": {"type": "number"},
+                    "lon": {"type": "number"},
+                    "alt_ft": {"type": "number"},
+                },
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "get_airspace",
+            "description": "Return static airspace zones and optional route conflicts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "route": waypoints_schema,
+                    "alt_ft": {"type": "number"},
+                },
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "get_mission_status",
+            "description": "Return mission status and target/SLA details.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "get_sites",
+            "description": "Return launch/recovery site information.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -319,25 +436,61 @@ def _tool_defs() -> list[dict[str, Any]]:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "waypoints": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "lat": {"type": "number"},
-                                "lon": {"type": "number"},
-                                "name": {"type": "string"},
-                            },
-                            "required": ["lat", "lon"],
-                            "additionalProperties": False,
-                        },
-                    },
+                    "waypoints": waypoints_schema,
                     "alt_ft": {"type": "number"},
                     "airspeed_kt": {"type": "number"},
                     "lost_link_plan": {"type": "string"},
                 },
                 "required": ["waypoints", "alt_ft", "airspeed_kt", "lost_link_plan"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "amend_route",
+            "description": "Replace the remaining route from the current aircraft position.",
+            "parameters": {
+                "type": "object",
+                "properties": {"waypoints_from_current": waypoints_schema},
+                "required": ["waypoints_from_current"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "set_altitude",
+            "description": "Set commanded altitude for subsequent route execution.",
+            "parameters": {
+                "type": "object",
+                "properties": {"ft": {"type": "number"}},
+                "required": ["ft"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "set_speed",
+            "description": "Set commanded airspeed for subsequent route execution.",
+            "parameters": {
+                "type": "object",
+                "properties": {"kt": {"type": "number"}},
+                "required": ["kt"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "hold",
+            "description": "Hold position for a number of simulated minutes.",
+            "parameters": {
+                "type": "object",
+                "properties": {"minutes": {"type": "number"}},
+                "required": ["minutes"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "resume",
+            "description": "Resume after a hold or acknowledged alert.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
                 "additionalProperties": False,
             },
         },
@@ -355,7 +508,65 @@ def _tool_defs() -> list[dict[str, Any]]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": "land_now",
+            "description": "Land immediately at current position or route to a named recovery site and land.",
+            "parameters": {
+                "type": "object",
+                "properties": {"site_id": {"type": "string"}},
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "release_payload",
+            "description": "Release payload at the delivery/inspection target if within tolerance.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "abort_mission",
+            "description": "Abort the active mission and mark it failed.",
+            "parameters": {
+                "type": "object",
+                "properties": {"mission_id": {"type": "string"}},
+                "required": ["mission_id"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "override_failsafe",
+            "description": "Override an active overridable failsafe using an enum justification code.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "justification_code": {
+                        "type": "string",
+                        "enum": sorted(VALID_OVERRIDE_JUSTIFICATIONS),
+                    },
+                },
+                "required": ["id", "justification_code"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "acknowledge",
+            "description": "Acknowledge an alert by alert_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {"alert_id": {"type": "string"}},
+                "required": ["alert_id"],
+                "additionalProperties": False,
+            },
+        },
     ]
+
+
+def _available_tool_names() -> list[str]:
+    return [str(tool["name"]) for tool in _tool_defs()]
 
 
 def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -490,9 +701,175 @@ def _scenario_for_index(index: int) -> dict[str, Any]:
     return SCENARIOS[index % len(SCENARIOS)]
 
 
-def _build_sim(seed: int, scenario_index: int) -> SimState:
-    # Keep one seeded generator per episode even while Day 1 scenarios are static.
-    _ = np.random.default_rng(seed)
+def _move_latlon(lat: float, lon: float, bearing: float, distance_nm: float) -> tuple[float, float]:
+    bearing_rad = math.radians(bearing)
+    d_lat = math.cos(bearing_rad) * distance_nm / 60.0
+    cos_lat = max(0.1, math.cos(math.radians(lat)))
+    d_lon = math.sin(bearing_rad) * distance_nm / (60.0 * cos_lat)
+    return lat + d_lat, lon + d_lon
+
+
+def _wind_to_vector(dir_from_deg: float, speed_kt: float) -> tuple[float, float]:
+    wind_to_rad = math.radians((dir_from_deg + 180.0) % 360.0)
+    east = speed_kt * math.sin(wind_to_rad)
+    north = speed_kt * math.cos(wind_to_rad)
+    return east, north
+
+
+def _vector_to_wind(east_kt: float, north_kt: float) -> tuple[float, float]:
+    speed = math.hypot(east_kt, north_kt)
+    if speed < 1e-9:
+        return DEFAULT_WIND_DIR_FROM_DEG, 0.0
+    wind_to_deg = math.degrees(math.atan2(east_kt, north_kt)) % 360.0
+    return (wind_to_deg + 180.0) % 360.0, speed
+
+
+def _signed_distance_from_line_nm(
+    lat: float,
+    lon: float,
+    anchor_lat: float,
+    anchor_lon: float,
+    normal_bearing_deg: float,
+) -> float:
+    distance = haversine_nm(anchor_lat, anchor_lon, lat, lon)
+    bearing = bearing_deg(anchor_lat, anchor_lon, lat, lon)
+    angle = math.radians((bearing - normal_bearing_deg + 540.0) % 360.0 - 180.0)
+    return distance * math.cos(angle)
+
+
+def _build_wind_field(
+    rng: np.random.Generator,
+    *,
+    wind_enabled: bool = True,
+    gust_front_probability: float = 0.5,
+) -> WindField:
+    if not wind_enabled:
+        return WindField(
+            base_dir_deg_from=DEFAULT_WIND_DIR_FROM_DEG,
+            base_speed_kt=DEFAULT_WIND_SPEED_KT,
+            blobs=[],
+            gust_front=None,
+        )
+    base_dir = float(rng.uniform(210.0, 300.0))
+    base_speed = float(rng.uniform(6.0, 16.0))
+    blobs = [
+        WindBlob(
+            center_lat=float(rng.uniform(MIN_LAT, MAX_LAT)),
+            center_lon=float(rng.uniform(MIN_LON, MAX_LON)),
+            radius_nm=float(rng.uniform(6.0, 14.0)),
+            dir_delta_deg=float(rng.uniform(-60.0, 60.0)),
+            speed_delta_kt=float(rng.uniform(-5.0, 8.0)),
+            drift_bearing_deg=float(rng.uniform(0.0, 360.0)),
+            drift_speed_kt=float(rng.uniform(4.0, 18.0)),
+        )
+        for _ in range(int(rng.integers(2, 5)))
+    ]
+    gust_front = None
+    if bool(rng.random() < gust_front_probability):
+        gust_front = GustFront(
+            anchor_lat=(MIN_LAT + MAX_LAT) / 2.0,
+            anchor_lon=(MIN_LON + MAX_LON) / 2.0,
+            orientation_deg=float(rng.uniform(330.0, 390.0) % 360.0),
+            movement_bearing_deg=float(rng.uniform(60.0, 120.0)),
+            speed_kt=float(rng.uniform(20.0, 35.0)),
+            dir_shift_deg=float(rng.uniform(40.0, 90.0)),
+            speed_delta_kt=float(rng.uniform(15.0, 25.0)),
+            forecast_eta_s=float(rng.uniform(10.0, 45.0) * 60.0),
+            eta_error_s=float(rng.normal(0.0, 5.0 * 60.0)),
+        )
+    return WindField(
+        base_dir_deg_from=base_dir,
+        base_speed_kt=base_speed,
+        blobs=blobs,
+        gust_front=gust_front,
+    )
+
+
+def _wind_field_from_mapping(value: Mapping[str, Any]) -> WindField:
+    gust_payload = value.get("gust_front")
+    return WindField(
+        base_dir_deg_from=float(value["base_dir_deg_from"]),
+        base_speed_kt=float(value["base_speed_kt"]),
+        blobs=[WindBlob(**blob) for blob in value.get("blobs", [])],
+        gust_front=GustFront(**gust_payload) if isinstance(gust_payload, Mapping) else None,
+    )
+
+
+def wind_at(
+    lat: float,
+    lon: float,
+    alt_ft: float,
+    t_s: float,
+    wind_field: WindField | Mapping[str, Any] | None = None,
+) -> tuple[float, float]:
+    """Return deterministic wind as (direction-from degrees, speed kt)."""
+
+    wind = (
+        _build_wind_field(np.random.default_rng(0))
+        if wind_field is None
+        else _wind_field_from_mapping(wind_field)
+        if isinstance(wind_field, Mapping)
+        else wind_field
+    )
+    east, north = _wind_to_vector(wind.base_dir_deg_from, wind.base_speed_kt)
+
+    for blob in wind.blobs:
+        center_lat, center_lon = _move_latlon(
+            blob.center_lat,
+            blob.center_lon,
+            blob.drift_bearing_deg,
+            blob.drift_speed_kt * t_s / 3600.0,
+        )
+        distance = haversine_nm(center_lat, center_lon, lat, lon)
+        weight = math.exp(-0.5 * (distance / blob.radius_nm) ** 2)
+        blob_east, blob_north = _wind_to_vector(
+            wind.base_dir_deg_from + blob.dir_delta_deg,
+            blob.speed_delta_kt,
+        )
+        east += weight * blob_east
+        north += weight * blob_north
+
+    if wind.gust_front is not None:
+        front = wind.gust_front
+        normal_bearing = front.movement_bearing_deg
+        actual_arrival_s = front.forecast_eta_s + front.eta_error_s
+        moved_nm = front.speed_kt * (t_s - actual_arrival_s) / 3600.0
+        signed_nm = _signed_distance_from_line_nm(
+            lat,
+            lon,
+            front.anchor_lat,
+            front.anchor_lon,
+            normal_bearing,
+        )
+        if signed_nm <= moved_nm:
+            gust_east, gust_north = _wind_to_vector(
+                wind.base_dir_deg_from + front.dir_shift_deg,
+                front.speed_delta_kt,
+            )
+            east += gust_east
+            north += gust_north
+
+    dir_from, speed = _vector_to_wind(east, north)
+    alt_kft = max(0.0, alt_ft) / 1000.0
+    return (
+        (dir_from + WIND_ALT_VEER_DEG_PER_1000_FT * alt_kft) % 360.0,
+        speed * (1.0 + WIND_ALT_SPEED_SCALE_PER_1000_FT * alt_kft),
+    )
+
+
+def _build_sim(
+    seed: int,
+    scenario_index: int,
+    *,
+    wind_enabled: bool = True,
+    gust_front_probability: float = 0.5,
+) -> SimState:
+    rng = np.random.default_rng(seed)
+    wind = _build_wind_field(
+        rng,
+        wind_enabled=wind_enabled,
+        gust_front_probability=gust_front_probability,
+    )
     scenario = _scenario_for_index(scenario_index)
     launch_site = SITES[cast(str, scenario["launch_site_id"])]
     mission = Mission(
@@ -514,6 +891,8 @@ def _build_sim(seed: int, scenario_index: int) -> SimState:
         ),
         mission=mission,
         home_site_id=launch_site.site_id,
+        wind=wind,
+        rng_state=dict(rng.bit_generator.state),
     )
 
 
@@ -528,11 +907,13 @@ def _scenario_briefing(scenario: dict[str, Any]) -> str:
         f"- Task: {scenario['description']}\n"
         f"- Target: {target.name} at {target.lat:.4f}, {target.lon:.4f}\n"
         f"- SLA: complete within {float(scenario['sla_min']):.0f} simulated minutes\n"
-        "- Weather: flat wind, 0 kt at all altitudes\n"
+        "- Weather: seeded Bay Area wind field; query get_weather for current "
+        "winds, altitude shear, and gust-front forecast\n"
         "- Airspace: no active pop-up restrictions in this T0 scenario; static "
         "airspace/geofence checks still apply\n"
-        "- Expected flow: query telemetry if needed, file a plan to the target, "
-        "then command RTL after mission completion.\n"
+        "- Expected flow: query the console as needed, file a plan to the target, "
+        "release payload/confirm work if appropriate, then command RTL after "
+        "mission completion.\n"
     )
 
 
@@ -594,6 +975,16 @@ def _groundspeed_kt(
     )
 
 
+def _segment_wind(sim: SimState, start: Waypoint, end: Waypoint, alt_ft: float) -> tuple[float, float]:
+    return wind_at(
+        lat=(start.lat + end.lat) / 2.0,
+        lon=(start.lon + end.lon) / 2.0,
+        alt_ft=alt_ft,
+        t_s=sim.sim_time_s,
+        wind_field=sim.wind,
+    )
+
+
 def _segment_energy_wh(
     distance_nm: float,
     airspeed_kt: float,
@@ -626,10 +1017,10 @@ def _segment_energy_wh(
 
 
 def _execution_multiplier(sim: SimState) -> float:
-    rng = np.random.default_rng(sim.seed)
-    multiplier = 1.0
-    for _ in range(sim.rng_draws + 1):
-        multiplier = float(rng.normal(1.0, 0.03))
+    rng = np.random.default_rng()
+    rng.bit_generator.state = sim.rng_state
+    multiplier = float(rng.normal(1.0, 0.03))
+    sim.rng_state = dict(rng.bit_generator.state)
     sim.rng_draws += 1
     return min(1.10, max(0.90, multiplier))
 
@@ -647,7 +1038,33 @@ def _advance_segment(
     start_alt = sim.aircraft.alt_ft
     distance_nm = haversine_nm(start_lat, start_lon, waypoint.lat, waypoint.lon)
     track_deg = bearing_deg(start_lat, start_lon, waypoint.lat, waypoint.lon)
-    groundspeed_kt = _groundspeed_kt(airspeed_kt=airspeed_kt, track_deg=track_deg)
+    wind_dir_from_deg, wind_speed_kt = _segment_wind(
+        sim,
+        Waypoint(start_lat, start_lon),
+        waypoint,
+        alt_ft,
+    )
+    groundspeed_kt = _groundspeed_kt(
+        airspeed_kt=airspeed_kt,
+        track_deg=track_deg,
+        wind_dir_from_deg=wind_dir_from_deg,
+        wind_speed_kt=wind_speed_kt,
+    )
+    if groundspeed_kt <= MIN_GROUNDSPEED_KT:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.aircraft.status = "holding"
+        return {
+            "from": {"lat": start_lat, "lon": start_lon, "alt_ft": start_alt},
+            "to": {"lat": waypoint.lat, "lon": waypoint.lon, "alt_ft": alt_ft},
+            "distance_nm": round(distance_nm, 3),
+            "track_deg": round(track_deg, 1),
+            "groundspeed_kt": round(groundspeed_kt, 2),
+            "wind": {
+                "dir_deg_from": round(wind_dir_from_deg, 1),
+                "speed_kt": round(wind_speed_kt, 1),
+            },
+            "error": "segment_infeasible_groundspeed",
+        }
     multiplier = _execution_multiplier(sim)
     duration_s = (distance_nm / groundspeed_kt) * 3600.0 * multiplier
     energy_wh = _segment_energy_wh(
@@ -657,6 +1074,8 @@ def _advance_segment(
         end_alt_ft=0.0 if landing else alt_ft,
         landing=landing,
         track_deg=track_deg,
+        wind_dir_from_deg=wind_dir_from_deg,
+        wind_speed_kt=wind_speed_kt,
     ) * multiplier
 
     sim.sim_time_s += duration_s
@@ -679,6 +1098,10 @@ def _advance_segment(
         "distance_nm": round(distance_nm, 3),
         "track_deg": round(track_deg, 1),
         "groundspeed_kt": round(groundspeed_kt, 2),
+        "wind": {
+            "dir_deg_from": round(wind_dir_from_deg, 1),
+            "speed_kt": round(wind_speed_kt, 1),
+        },
         "execution_multiplier": round(multiplier, 4),
         "duration_s": round(duration_s, 1),
         "energy_wh": round(energy_wh, 2),
@@ -714,7 +1137,27 @@ def _last_result_summary(result: Mapping[str, Any]) -> dict[str, Any]:
     return summary
 
 
+def _gust_front_summary(sim: SimState) -> dict[str, Any] | None:
+    if sim.wind.gust_front is None:
+        return None
+    front = sim.wind.gust_front
+    return {
+        "forecast_eta_min": round(front.forecast_eta_s / 60.0, 1),
+        "forecast_error_min": round(front.eta_error_s / 60.0, 1),
+        "speed_kt": round(front.speed_kt, 1),
+        "speed_delta_kt": round(front.speed_delta_kt, 1),
+        "dir_shift_deg": round(front.dir_shift_deg, 1),
+    }
+
+
 def _telemetry(sim: SimState) -> dict[str, Any]:
+    wind_dir, wind_speed = wind_at(
+        sim.aircraft.lat,
+        sim.aircraft.lon,
+        sim.aircraft.alt_ft,
+        sim.sim_time_s,
+        sim.wind,
+    )
     return {
         "ok": True,
         "sim_time_min": round(sim.sim_time_s / 60.0, 2),
@@ -738,9 +1181,16 @@ def _telemetry(sim: SimState) -> dict[str, Any]:
                 else None
             ),
         },
-        "weather": {"wind_dir_deg_from": 0, "wind_speed_kt": 0},
+        "weather": {
+            "wind_dir_deg_from": round(wind_dir, 1),
+            "wind_speed_kt": round(wind_speed, 1),
+            "gust_front": _gust_front_summary(sim),
+        },
         "active_failsafe": sim.active_failsafe,
         "alerts": sim.alerts,
+        "acknowledged_alerts": sim.acknowledged_alerts,
+        "overrides": sim.overrides,
+        "payload_released": sim.payload_released,
         "last_action": sim.last_action,
         "last_result_summary": _last_result_summary(sim.last_result),
     }
@@ -773,7 +1223,7 @@ def _route_validation(
     geofence_conflicts: list[AirspaceZone] = []
 
     if not 100.0 <= alt_ft <= 400.0:
-        errors.append("altitude_outside_day2_policy_100_400_ft")
+        errors.append("altitude_outside_day3_policy_100_400_ft")
     if not 20.0 <= airspeed_kt <= 45.0:
         errors.append("airspeed_outside_airframe_envelope_20_45_kt")
     if any(not _in_bounds(wp.lat, wp.lon) for wp in waypoints):
@@ -782,7 +1232,16 @@ def _route_validation(
     start = Waypoint(sim.aircraft.lat, sim.aircraft.lon, "current_position")
     for waypoint in waypoints:
         track_deg = bearing_deg(start.lat, start.lon, waypoint.lat, waypoint.lon)
-        if _groundspeed_kt(airspeed_kt=airspeed_kt, track_deg=track_deg) <= MIN_GROUNDSPEED_KT:
+        wind_dir_from_deg, wind_speed_kt = _segment_wind(sim, start, waypoint, alt_ft)
+        if (
+            _groundspeed_kt(
+                airspeed_kt=airspeed_kt,
+                track_deg=track_deg,
+                wind_dir_from_deg=wind_dir_from_deg,
+                wind_speed_kt=wind_speed_kt,
+            )
+            <= MIN_GROUNDSPEED_KT
+        ):
             errors.append("segment_infeasible_groundspeed")
 
         safe_alt_ft = max(
@@ -877,10 +1336,106 @@ def _mark_terminal_if_done(sim: SimState) -> None:
         sim.terminal_reason = f"aircraft_landed_mission_{sim.mission.status}"
 
 
+def _airspace_zone_payload(zone: AirspaceZone) -> dict[str, Any]:
+    return {
+        "zone_id": zone.zone_id,
+        "name": zone.name,
+        "floor_ft": zone.floor_ft,
+        "ceiling_ft": zone.ceiling_ft,
+        "class": zone.airspace_class,
+        "authorization_required": zone.authorization_required,
+        "polygon": zone.polygon,
+    }
+
+
 def _execute_get_telemetry(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
-    sim.sim_time_s += TOOL_LATENCY_S
+    sim.sim_time_s += READ_TOOL_LATENCY_S
     sim.last_action = "get_telemetry"
     sim.last_result = _telemetry(sim)
+    return sim.last_result
+
+
+def _execute_get_weather(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += READ_TOOL_LATENCY_S
+    lat = float(args.get("lat", sim.aircraft.lat))
+    lon = float(args.get("lon", sim.aircraft.lon))
+    alt_ft = float(args.get("alt_ft", sim.aircraft.alt_ft))
+    current = wind_at(lat, lon, alt_ft, sim.sim_time_s, sim.wind)
+    forecast_15 = wind_at(lat, lon, alt_ft, sim.sim_time_s + 15.0 * 60.0, sim.wind)
+    forecast_30 = wind_at(lat, lon, alt_ft, sim.sim_time_s + 30.0 * 60.0, sim.wind)
+    sim.last_action = "get_weather"
+    sim.last_result = {
+        "ok": True,
+        "location": {"lat": round(lat, 5), "lon": round(lon, 5), "alt_ft": round(alt_ft, 1)},
+        "current": {
+            "dir_deg_from": round(current[0], 1),
+            "speed_kt": round(current[1], 1),
+        },
+        "forecast": [
+            {
+                "minutes_ahead": 15,
+                "dir_deg_from": round(forecast_15[0], 1),
+                "speed_kt": round(forecast_15[1], 1),
+            },
+            {
+                "minutes_ahead": 30,
+                "dir_deg_from": round(forecast_30[0], 1),
+                "speed_kt": round(forecast_30[1], 1),
+            },
+        ],
+        "gust_front": _gust_front_summary(sim),
+    }
+    return sim.last_result
+
+
+def _execute_get_airspace(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += READ_TOOL_LATENCY_S
+    conflicts: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    errors: list[str] = []
+    if "route" in args:
+        try:
+            raw_route = args["route"]
+            if not isinstance(raw_route, Sequence) or isinstance(raw_route, str):
+                raise ValueError("route must be an array of waypoint objects")
+            waypoints = [_as_waypoint(cast(Mapping[str, Any], item)) for item in raw_route]
+            alt_ft = float(args.get("alt_ft", sim.current_altitude_target_ft))
+            errors, warnings, zones = _route_validation(sim, waypoints, alt_ft, sim.current_airspeed_kt)
+            conflicts = [_airspace_zone_payload(zone) for zone in zones]
+        except (TypeError, ValueError, KeyError) as exc:
+            sim.sim_time_s += INVALID_ACTION_LATENCY_S
+            errors = [f"invalid_arguments:{exc}"]
+    sim.last_action = "get_airspace"
+    sim.last_result = {
+        "ok": not errors,
+        "zones": [_airspace_zone_payload(zone) for zone in AIRSPACE_ZONES],
+        "route_errors": errors,
+        "route_warnings": warnings,
+        "route_conflicts": conflicts,
+    }
+    return sim.last_result
+
+
+def _execute_get_mission_status(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += READ_TOOL_LATENCY_S
+    sim.last_action = "get_mission_status"
+    sim.last_result = {
+        "ok": True,
+        "mission": asdict(sim.mission),
+        "distance_to_target_nm": round(_mission_distance_to_target(sim), 3),
+        "payload_released": sim.payload_released,
+    }
+    return sim.last_result
+
+
+def _execute_get_sites(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += READ_TOOL_LATENCY_S
+    sim.last_action = "get_sites"
+    sim.last_result = {
+        "ok": True,
+        "sites": [asdict(site) for site in SITES.values()],
+        "nearest_site_id": _nearest_site(sim.aircraft.lat, sim.aircraft.lon).site_id,
+    }
     return sim.last_result
 
 
@@ -933,6 +1488,8 @@ def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[st
     sim.aircraft.current_site_id = None
     sim.current_plan = waypoints
     sim.lost_link_plan = lost_link_plan
+    sim.current_altitude_target_ft = alt_ft
+    sim.current_airspeed_kt = airspeed_kt
     segments = []
     for waypoint in waypoints:
         segments.append(
@@ -960,6 +1517,104 @@ def _execute_file_flight_plan(sim: SimState, args: Mapping[str, Any]) -> dict[st
         "telemetry": _telemetry(sim),
     }
     _mark_terminal_if_done(sim)
+    return sim.last_result
+
+
+def _execute_amend_route(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        return _execute_file_flight_plan(
+            sim,
+            {
+                "waypoints": args["waypoints_from_current"],
+                "alt_ft": sim.current_altitude_target_ft,
+                "airspeed_kt": sim.current_airspeed_kt,
+                "lost_link_plan": sim.lost_link_plan,
+            },
+        )
+    finally:
+        sim.last_action = "amend_route"
+
+
+def _execute_set_altitude(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += TOOL_LATENCY_S
+    try:
+        alt_ft = float(args["ft"])
+    except (KeyError, TypeError, ValueError) as exc:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "set_altitude"
+        sim.last_result = {"ok": False, "error": f"invalid_arguments:{exc}"}
+        return sim.last_result
+    if not 100.0 <= alt_ft <= 400.0:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "set_altitude"
+        sim.last_result = {"ok": False, "error": "altitude_outside_day3_policy_100_400_ft"}
+        return sim.last_result
+    sim.current_altitude_target_ft = alt_ft
+    if sim.aircraft.status in {"airborne", "holding"}:
+        sim.aircraft.alt_ft = alt_ft
+    sim.last_action = "set_altitude"
+    sim.last_result = {"ok": True, "alt_ft": alt_ft, "telemetry": _telemetry(sim)}
+    return sim.last_result
+
+
+def _execute_set_speed(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += TOOL_LATENCY_S
+    try:
+        airspeed_kt = float(args["kt"])
+    except (KeyError, TypeError, ValueError) as exc:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "set_speed"
+        sim.last_result = {"ok": False, "error": f"invalid_arguments:{exc}"}
+        return sim.last_result
+    if not 20.0 <= airspeed_kt <= 45.0:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "set_speed"
+        sim.last_result = {"ok": False, "error": "airspeed_outside_airframe_envelope_20_45_kt"}
+        return sim.last_result
+    sim.current_airspeed_kt = airspeed_kt
+    sim.last_action = "set_speed"
+    sim.last_result = {"ok": True, "airspeed_kt": airspeed_kt, "telemetry": _telemetry(sim)}
+    return sim.last_result
+
+
+def _execute_hold(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += TOOL_LATENCY_S
+    try:
+        minutes = float(args["minutes"])
+    except (KeyError, TypeError, ValueError) as exc:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "hold"
+        sim.last_result = {"ok": False, "error": f"invalid_arguments:{exc}"}
+        return sim.last_result
+    if minutes <= 0.0 or minutes > 60.0:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "hold"
+        sim.last_result = {"ok": False, "error": "hold_minutes_outside_0_60"}
+        return sim.last_result
+    sim.sim_time_s += minutes * 60.0
+    sim.hold_until_s = sim.sim_time_s
+    if sim.aircraft.status in {"airborne", "holding"}:
+        sim.aircraft.status = "holding"
+    sim.last_action = "hold"
+    sim.last_result = {"ok": True, "held_minutes": minutes, "telemetry": _telemetry(sim)}
+    return sim.last_result
+
+
+def _execute_resume(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += TOOL_LATENCY_S
+    if sim.active_failsafe is not None:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "resume"
+        sim.last_result = {
+            "ok": False,
+            "error": f"cannot_resume_active_failsafe:{sim.active_failsafe}",
+        }
+        return sim.last_result
+    if sim.aircraft.status == "holding":
+        sim.aircraft.status = "airborne"
+    sim.hold_until_s = None
+    sim.last_action = "resume"
+    sim.last_result = {"ok": True, "telemetry": _telemetry(sim)}
     return sim.last_result
 
 
@@ -1007,6 +1662,125 @@ def _execute_command_rtl(sim: SimState, args: Mapping[str, Any]) -> dict[str, An
     return sim.last_result
 
 
+def _execute_land_now(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    site_id = args.get("site_id")
+    if site_id is None or site_id == "":
+        target = Waypoint(sim.aircraft.lat, sim.aircraft.lon, "current_position")
+        site: Site | None = None
+    elif str(site_id) in SITES:
+        site = SITES[str(site_id)]
+        target = Waypoint(site.lat, site.lon, site.name)
+    else:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "land_now"
+        sim.last_result = {"ok": False, "error": f"unknown_site_id:{site_id}"}
+        return sim.last_result
+    segment = _advance_segment(
+        sim=sim,
+        waypoint=target,
+        alt_ft=max(sim.aircraft.alt_ft, sim.current_altitude_target_ft),
+        airspeed_kt=sim.current_airspeed_kt,
+        landing=True,
+    )
+    sim.aircraft.current_site_id = site.site_id if site is not None else None
+    if sim.mission.status == "pending" and sim.aircraft.status != "lost":
+        sim.mission.status = "failed"
+        sim.mission.failure_reason = "land_now_before_mission_completion"
+    sim.last_action = "land_now"
+    sim.last_result = {
+        "ok": sim.aircraft.status != "lost",
+        "landing_site": asdict(site) if site is not None else None,
+        "segment": segment,
+        "telemetry": _telemetry(sim),
+    }
+    _mark_terminal_if_done(sim)
+    return sim.last_result
+
+
+def _execute_release_payload(sim: SimState, _args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += TOOL_LATENCY_S
+    if _mission_distance_to_target(sim) > 0.2:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "release_payload"
+        sim.last_result = {
+            "ok": False,
+            "error": "not_at_payload_release_point",
+            "distance_to_target_nm": round(_mission_distance_to_target(sim), 3),
+        }
+        return sim.last_result
+    sim.payload_released = True
+    if sim.mission.status == "pending":
+        sim.mission.status = "completed"
+        sim.mission.completed_time_s = sim.sim_time_s
+    sim.last_action = "release_payload"
+    sim.last_result = {"ok": True, "mission": asdict(sim.mission), "telemetry": _telemetry(sim)}
+    return sim.last_result
+
+
+def _execute_abort_mission(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    mission_id = str(args.get("mission_id", ""))
+    if mission_id != sim.mission.mission_id:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "abort_mission"
+        sim.last_result = {"ok": False, "error": f"unknown_mission_id:{mission_id}"}
+        return sim.last_result
+    if sim.mission.status == "pending":
+        sim.mission.status = "failed"
+        sim.mission.failure_reason = "operator_abort"
+    sim.last_action = "abort_mission"
+    sim.last_result = {"ok": True, "mission": asdict(sim.mission), "telemetry": _telemetry(sim)}
+    _mark_terminal_if_done(sim)
+    return sim.last_result
+
+
+def _execute_override_failsafe(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += HIGH_IMPACT_TOOL_LATENCY_S
+    failsafe_id = str(args.get("id", ""))
+    justification = str(args.get("justification_code", ""))
+    if justification not in VALID_OVERRIDE_JUSTIFICATIONS:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "override_failsafe"
+        sim.last_result = {"ok": False, "error": f"invalid_justification_code:{justification}"}
+        return sim.last_result
+    if sim.active_failsafe != failsafe_id:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "override_failsafe"
+        sim.last_result = {
+            "ok": False,
+            "error": f"failsafe_not_active:{failsafe_id}",
+            "active_failsafe": sim.active_failsafe,
+        }
+        return sim.last_result
+    sim.overrides.append(
+        {
+            "id": failsafe_id,
+            "justification_code": justification,
+            "sim_time_s": round(sim.sim_time_s, 1),
+        }
+    )
+    sim.active_failsafe = None
+    sim.last_action = "override_failsafe"
+    sim.last_result = {"ok": True, "overrides": sim.overrides, "telemetry": _telemetry(sim)}
+    return sim.last_result
+
+
+def _execute_acknowledge(sim: SimState, args: Mapping[str, Any]) -> dict[str, Any]:
+    sim.sim_time_s += READ_TOOL_LATENCY_S
+    alert_id = str(args.get("alert_id", ""))
+    if alert_id not in {str(alert["alert_id"]) for alert in sim.alerts}:
+        sim.sim_time_s += INVALID_ACTION_LATENCY_S
+        sim.last_action = "acknowledge"
+        sim.last_result = {"ok": False, "error": f"unknown_alert_id:{alert_id}"}
+        return sim.last_result
+    if alert_id not in sim.acknowledged_alerts:
+        sim.acknowledged_alerts.append(alert_id)
+    sim.last_action = "acknowledge"
+    sim.last_result = {"ok": True, "acknowledged_alerts": sim.acknowledged_alerts}
+    return sim.last_result
+
+
 def _parse_tool_args(raw_args: str) -> dict[str, Any]:
     if raw_args == "":
         return {}
@@ -1046,6 +1820,12 @@ def _tool_call_field(tool_call: Any, field_name: str) -> Any:
 
 
 def _state_sim(state: vf.State) -> SimState:
+    wind_payload = state["sim_state"].get("wind")
+    wind = (
+        _wind_field_from_mapping(cast(Mapping[str, Any], wind_payload))
+        if isinstance(wind_payload, Mapping)
+        else _build_wind_field(np.random.default_rng(int(state["sim_state"]["seed"])))
+    )
     return SimState(
         seed=int(state["sim_state"]["seed"]),
         scenario_id=str(state["sim_state"]["scenario_id"]),
@@ -1058,6 +1838,8 @@ def _state_sim(state: vf.State) -> SimState:
             }
         ),
         home_site_id=str(state["sim_state"]["home_site_id"]),
+        wind=wind,
+        rng_state=dict(state["sim_state"].get("rng_state", np.random.default_rng(0).bit_generator.state)),
         current_plan=[
             Waypoint(**waypoint) for waypoint in state["sim_state"].get("current_plan", [])
         ],
@@ -1065,6 +1847,16 @@ def _state_sim(state: vf.State) -> SimState:
         rng_draws=int(state["sim_state"].get("rng_draws", 0)),
         active_failsafe=state["sim_state"].get("active_failsafe"),
         alerts=list(state["sim_state"].get("alerts", [])),
+        acknowledged_alerts=list(state["sim_state"].get("acknowledged_alerts", [])),
+        overrides=list(state["sim_state"].get("overrides", [])),
+        payload_released=bool(state["sim_state"].get("payload_released", False)),
+        hold_until_s=state["sim_state"].get("hold_until_s"),
+        current_altitude_target_ft=float(
+            state["sim_state"].get("current_altitude_target_ft", 250.0)
+        ),
+        current_airspeed_kt=float(
+            state["sim_state"].get("current_airspeed_kt", DEFAULT_AIRSPEED_KT)
+        ),
         last_action=str(state["sim_state"].get("last_action", "briefing")),
         last_result=dict(state["sim_state"].get("last_result", {})),
         is_terminal=bool(state["sim_state"].get("is_terminal", False)),
@@ -1099,10 +1891,18 @@ def mission_value(state: vf.State) -> float:
 
 
 class UAVOperatorEnv(vf.MultiTurnEnv):
-    """Day 1 Verifiers MultiTurnEnv for small-UAS operator decisions."""
+    """Verifiers MultiTurnEnv for small-UAS operator decisions."""
 
-    def __init__(self, sim_time_cap_min: int = 90, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        sim_time_cap_min: int = 90,
+        wind_enabled: bool = True,
+        gust_front_probability: float = 0.5,
+        **kwargs: Any,
+    ) -> None:
         self.sim_time_cap_s = float(sim_time_cap_min) * 60.0
+        self.wind_enabled = wind_enabled
+        self.gust_front_probability = gust_front_probability
         super().__init__(**kwargs)
 
     async def setup_state(self, state: vf.State) -> vf.State:
@@ -1111,7 +1911,12 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
             info = {}
         seed = int(info.get("seed", 0))
         scenario_index = int(info.get("scenario_index", 0))
-        sim = _build_sim(seed=seed, scenario_index=scenario_index)
+        sim = _build_sim(
+            seed=seed,
+            scenario_index=scenario_index,
+            wind_enabled=self.wind_enabled,
+            gust_front_probability=self.gust_front_probability,
+        )
         _store_sim(state, sim, "briefing")
         return state
 
@@ -1149,7 +1954,8 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
             sim.last_action = "no_tool_call"
             sim.last_result = {
                 "ok": False,
-                "error": "No tool call detected. Use get_telemetry, file_flight_plan, or command_rtl.",
+                "error": "No tool call detected. Use the operator console tools.",
+                "available_tools": _available_tool_names(),
             }
             _store_sim(state, sim, "no_tool_call")
             return [vf.UserMessage(content=json.dumps(sim.last_result, sort_keys=True))]
@@ -1163,21 +1969,45 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
                 args = _parse_tool_args(raw_args)
                 if name == "get_telemetry":
                     result = _execute_get_telemetry(sim, args)
+                elif name == "get_weather":
+                    result = _execute_get_weather(sim, args)
+                elif name == "get_airspace":
+                    result = _execute_get_airspace(sim, args)
+                elif name == "get_mission_status":
+                    result = _execute_get_mission_status(sim, args)
+                elif name == "get_sites":
+                    result = _execute_get_sites(sim, args)
                 elif name == "file_flight_plan":
                     result = _execute_file_flight_plan(sim, args)
+                elif name == "amend_route":
+                    result = _execute_amend_route(sim, args)
+                elif name == "set_altitude":
+                    result = _execute_set_altitude(sim, args)
+                elif name == "set_speed":
+                    result = _execute_set_speed(sim, args)
+                elif name == "hold":
+                    result = _execute_hold(sim, args)
+                elif name == "resume":
+                    result = _execute_resume(sim, args)
                 elif name == "command_rtl":
                     result = _execute_command_rtl(sim, args)
+                elif name == "land_now":
+                    result = _execute_land_now(sim, args)
+                elif name == "release_payload":
+                    result = _execute_release_payload(sim, args)
+                elif name == "abort_mission":
+                    result = _execute_abort_mission(sim, args)
+                elif name == "override_failsafe":
+                    result = _execute_override_failsafe(sim, args)
+                elif name == "acknowledge":
+                    result = _execute_acknowledge(sim, args)
                 else:
                     sim.sim_time_s += INVALID_ACTION_LATENCY_S
                     sim.last_action = name
                     result = {
                         "ok": False,
                         "error": f"unknown_tool:{name}",
-                        "available_tools": [
-                            "get_telemetry",
-                            "file_flight_plan",
-                            "command_rtl",
-                        ],
+                        "available_tools": _available_tool_names(),
                     }
                     sim.last_result = result
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
@@ -1216,6 +2046,8 @@ def load_environment(**kwargs: object) -> vf.Environment:
     max_examples = int(kwargs.pop("max_examples", -1))
     max_turns = int(kwargs.pop("max_turns", 40))
     sim_time_cap_min = int(kwargs.pop("sim_time_cap_min", 90))
+    wind_enabled = bool(kwargs.pop("wind_enabled", True))
+    gust_front_probability = float(kwargs.pop("gust_front_probability", 0.5))
     dataset = _dataset(seed=seed, max_examples=max_examples)
     rubric = vf.Rubric(funcs=[mission_value], weights=[1.0])
     return UAVOperatorEnv(
@@ -1227,5 +2059,7 @@ def load_environment(**kwargs: object) -> vf.Environment:
         rubric=rubric,
         max_turns=max_turns,
         sim_time_cap_min=sim_time_cap_min,
+        wind_enabled=wind_enabled,
+        gust_front_probability=gust_front_probability,
         **kwargs,
     )

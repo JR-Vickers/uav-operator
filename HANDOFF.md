@@ -1,5 +1,42 @@
 # HANDOFF.md
 
+## 2026-07-10 Day 3 wind + full console
+
+Changed:
+- Added seeded per-episode wind fields with base flow, 2-4 translating
+  perturbation blobs, optional moving gust fronts, forecast ETA/error, and
+  altitude shear.
+- Switched execution noise to a serialized NumPy bit-generator state so wind
+  generation and segment multipliers stay on one deterministic RNG stream.
+- Updated route validation, segment timing, and energy burn to use the same
+  `wind_at(...)` helper exposed for tests/renderer use.
+- Expanded the operator console to the full SPEC §3.2 tool set:
+  weather/airspace/mission/sites reads plus route amendment, altitude/speed
+  changes, hold/resume, land now, release payload, abort, failsafe override,
+  and alert acknowledgement.
+- Added structured sim-time costs for read, routine action, high-impact action,
+  and invalid tool calls.
+- Added override and acknowledgement state to simulator snapshots without
+  adding any text-parsing reward path.
+- Added `assets/rollouts/day3_scripted_rollout.json` as a deterministic local
+  rollout artifact generated from the environment itself.
+- Updated README status and taskset config notes for Day 3.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run --with pytest pytest -q` passes: 10 tests.
+
+Broken / not done:
+- I did not run live `vf-eval uav-operator -m <model> -n 2 -r 1`; it still
+  depends on configured model/provider credentials.
+- Reward is still Day 1 mission-value-only by design; full SPEC §5 rubric,
+  baselines, and T0-T1 generator remain Day 4.
+
+Next action:
+- Implement PLAN.md Day 4: full reward v0, rulebook/reckless baselines,
+  T0-T1 scenario generator, determinism check in CI shape, and first model
+  contact through Prime Inference if credentials are available.
+
 ## 2026-07-10 Day 2 geography + energy
 
 Changed:

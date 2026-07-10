@@ -1,0 +1,1631 @@
+{
+  "actions": [
+    {
+      "arguments": {
+        "alt_ft": 300
+      },
+      "tool": "get_weather"
+    },
+    {
+      "arguments": {
+        "alt_ft": 300,
+        "route": [
+          {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        ]
+      },
+      "tool": "get_airspace"
+    },
+    {
+      "arguments": {
+        "airspeed_kt": 35,
+        "alt_ft": 300,
+        "lost_link_plan": "return_home",
+        "waypoints": [
+          {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        ]
+      },
+      "tool": "file_flight_plan"
+    },
+    {
+      "arguments": {},
+      "tool": "release_payload"
+    },
+    {
+      "arguments": {
+        "site_id": "mission_bay"
+      },
+      "tool": "command_rtl"
+    }
+  ],
+  "env_id": "uav-operator",
+  "kind": "scripted_rollout",
+  "responses": [
+    {
+      "current": {
+        "dir_deg_from": 277.0,
+        "speed_kt": 13.5
+      },
+      "forecast": [
+        {
+          "dir_deg_from": 318.2,
+          "minutes_ahead": 15,
+          "speed_kt": 23.3
+        },
+        {
+          "dir_deg_from": 316.8,
+          "minutes_ahead": 30,
+          "speed_kt": 23.5
+        }
+      ],
+      "gust_front": {
+        "dir_shift_deg": 58.5,
+        "forecast_error_min": -7.0,
+        "forecast_eta_min": 18.8,
+        "speed_delta_kt": 15.6,
+        "speed_kt": 27.6
+      },
+      "location": {
+        "alt_ft": 300.0,
+        "lat": 37.7707,
+        "lon": -122.3869
+      },
+      "ok": true
+    },
+    {
+      "ok": true,
+      "route_conflicts": [],
+      "route_errors": [],
+      "route_warnings": [],
+      "zones": [
+        {
+          "authorization_required": true,
+          "ceiling_ft": 3000.0,
+          "class": "B",
+          "floor_ft": 0.0,
+          "name": "SFO Class B Core",
+          "polygon": [
+            [
+              37.585,
+              -122.425
+            ],
+            [
+              37.65,
+              -122.425
+            ],
+            [
+              37.665,
+              -122.365
+            ],
+            [
+              37.62,
+              -122.335
+            ],
+            [
+              37.57,
+              -122.365
+            ]
+          ],
+          "zone_id": "sfo_b_core"
+        },
+        {
+          "authorization_required": true,
+          "ceiling_ft": 3000.0,
+          "class": "B",
+          "floor_ft": 1500.0,
+          "name": "SFO Class B North Shelf",
+          "polygon": [
+            [
+              37.65,
+              -122.5
+            ],
+            [
+              37.735,
+              -122.5
+            ],
+            [
+              37.735,
+              -122.36
+            ],
+            [
+              37.665,
+              -122.365
+            ]
+          ],
+          "zone_id": "sfo_b_north_shelf"
+        },
+        {
+          "authorization_required": false,
+          "ceiling_ft": 2500.0,
+          "class": "C",
+          "floor_ft": 0.0,
+          "name": "OAK Class C Core",
+          "polygon": [
+            [
+              37.69,
+              -122.245
+            ],
+            [
+              37.76,
+              -122.245
+            ],
+            [
+              37.775,
+              -122.185
+            ],
+            [
+              37.715,
+              -122.155
+            ],
+            [
+              37.675,
+              -122.19
+            ]
+          ],
+          "zone_id": "oak_c_core"
+        },
+        {
+          "authorization_required": false,
+          "ceiling_ft": 2500.0,
+          "class": "D",
+          "floor_ft": 0.0,
+          "name": "San Carlos Class D",
+          "polygon": [
+            [
+              37.495,
+              -122.29
+            ],
+            [
+              37.555,
+              -122.29
+            ],
+            [
+              37.575,
+              -122.235
+            ],
+            [
+              37.53,
+              -122.19
+            ],
+            [
+              37.485,
+              -122.22
+            ]
+          ],
+          "zone_id": "sql_d"
+        },
+        {
+          "authorization_required": true,
+          "ceiling_ft": 2000.0,
+          "class": "NO_FLY",
+          "floor_ft": 0.0,
+          "name": "Oakland Coliseum event no-fly polygon",
+          "polygon": [
+            [
+              37.7465,
+              -122.2075
+            ],
+            [
+              37.757,
+              -122.2075
+            ],
+            [
+              37.757,
+              -122.193
+            ],
+            [
+              37.7465,
+              -122.193
+            ]
+          ],
+          "zone_id": "oakland_coliseum_no_fly"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "segments": [
+        {
+          "distance_nm": 3.229,
+          "duration_s": 319.5,
+          "energy_wh": 22.98,
+          "execution_multiplier": 1.015,
+          "from": {
+            "alt_ft": 0.0,
+            "lat": 37.7707,
+            "lon": -122.3869
+          },
+          "groundspeed_kt": 36.93,
+          "to": {
+            "alt_ft": 300.0,
+            "lat": 37.823,
+            "lon": -122.371
+          },
+          "track_deg": 13.5,
+          "wind": {
+            "dir_deg_from": 275.5,
+            "speed_kt": 13.9
+          }
+        }
+      ],
+      "telemetry": {
+        "acknowledged_alerts": [],
+        "active_failsafe": null,
+        "aircraft": {
+          "alt_ft": 300.0,
+          "battery_pct": 94.26,
+          "battery_wh": 377.02,
+          "lat": 37.823,
+          "lon": -122.371,
+          "status": "holding"
+        },
+        "alerts": [],
+        "last_action": "file_flight_plan",
+        "last_result_summary": {
+          "ok": true
+        },
+        "mission": {
+          "completed_time_min": 5.99,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        },
+        "ok": true,
+        "overrides": [],
+        "payload_released": false,
+        "sim_time_min": 5.99,
+        "weather": {
+          "gust_front": {
+            "dir_shift_deg": 58.5,
+            "forecast_error_min": -7.0,
+            "forecast_eta_min": 18.8,
+            "speed_delta_kt": 15.6,
+            "speed_kt": 27.6
+          },
+          "wind_dir_deg_from": 274.0,
+          "wind_speed_kt": 14.5
+        }
+      },
+      "warnings": []
+    },
+    {
+      "mission": {
+        "completed_time_s": 359.5275483371171,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "completed",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "ok": true,
+      "telemetry": {
+        "acknowledged_alerts": [],
+        "active_failsafe": null,
+        "aircraft": {
+          "alt_ft": 300.0,
+          "battery_pct": 94.26,
+          "battery_wh": 377.02,
+          "lat": 37.823,
+          "lon": -122.371,
+          "status": "holding"
+        },
+        "alerts": [],
+        "last_action": "release_payload",
+        "last_result_summary": {
+          "ok": true,
+          "segment_count": 1,
+          "warnings": []
+        },
+        "mission": {
+          "completed_time_min": 5.99,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        },
+        "ok": true,
+        "overrides": [],
+        "payload_released": true,
+        "sim_time_min": 6.33,
+        "weather": {
+          "gust_front": {
+            "dir_shift_deg": 58.5,
+            "forecast_error_min": -7.0,
+            "forecast_eta_min": 18.8,
+            "speed_delta_kt": 15.6,
+            "speed_kt": 27.6
+          },
+          "wind_dir_deg_from": 274.0,
+          "wind_speed_kt": 14.5
+        }
+      }
+    },
+    {
+      "landing_site": {
+        "kind": "recovery",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "name": "Mission Bay Pad",
+        "site_id": "mission_bay"
+      },
+      "ok": true,
+      "segment": {
+        "distance_nm": 3.229,
+        "duration_s": 359.0,
+        "energy_wh": 57.26,
+        "execution_multiplier": 1.0146,
+        "from": {
+          "alt_ft": 300.0,
+          "lat": 37.823,
+          "lon": -122.371
+        },
+        "groundspeed_kt": 32.85,
+        "to": {
+          "alt_ft": 0.0,
+          "lat": 37.7707,
+          "lon": -122.3869
+        },
+        "track_deg": 193.5,
+        "wind": {
+          "dir_deg_from": 274.8,
+          "speed_kt": 14.2
+        }
+      },
+      "telemetry": {
+        "acknowledged_alerts": [],
+        "active_failsafe": null,
+        "aircraft": {
+          "alt_ft": 0.0,
+          "battery_pct": 79.94,
+          "battery_wh": 319.76,
+          "lat": 37.7707,
+          "lon": -122.3869,
+          "status": "landed"
+        },
+        "alerts": [],
+        "last_action": "command_rtl",
+        "last_result_summary": {
+          "ok": true
+        },
+        "mission": {
+          "completed_time_min": 5.99,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        },
+        "ok": true,
+        "overrides": [],
+        "payload_released": true,
+        "sim_time_min": 12.64,
+        "weather": {
+          "gust_front": {
+            "dir_shift_deg": 58.5,
+            "forecast_error_min": -7.0,
+            "forecast_eta_min": 18.8,
+            "speed_delta_kt": 15.6,
+            "speed_kt": 27.6
+          },
+          "wind_dir_deg_from": 317.1,
+          "wind_speed_kt": 22.3
+        }
+      }
+    },
+    {
+      "reward_preview": 1.0,
+      "telemetry": {
+        "acknowledged_alerts": [],
+        "active_failsafe": null,
+        "aircraft": {
+          "alt_ft": 0.0,
+          "battery_pct": 79.94,
+          "battery_wh": 319.76,
+          "lat": 37.7707,
+          "lon": -122.3869,
+          "status": "landed"
+        },
+        "alerts": [],
+        "last_action": "command_rtl",
+        "last_result_summary": {
+          "landing_site": {
+            "kind": "recovery",
+            "lat": 37.7707,
+            "lon": -122.3869,
+            "name": "Mission Bay Pad",
+            "site_id": "mission_bay"
+          },
+          "ok": true,
+          "segment": {
+            "distance_nm": 3.229,
+            "duration_s": 359.0,
+            "energy_wh": 57.26
+          }
+        },
+        "mission": {
+          "completed_time_min": 5.99,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        },
+        "ok": true,
+        "overrides": [],
+        "payload_released": true,
+        "sim_time_min": 12.64,
+        "weather": {
+          "gust_front": {
+            "dir_shift_deg": 58.5,
+            "forecast_error_min": -7.0,
+            "forecast_eta_min": 18.8,
+            "speed_delta_kt": 15.6,
+            "speed_kt": 27.6
+          },
+          "wind_dir_deg_from": 317.1,
+          "wind_speed_kt": 22.3
+        }
+      },
+      "terminal": true,
+      "terminal_reason": "aircraft_landed_mission_completed"
+    }
+  ],
+  "scenario_index": 0,
+  "seed": 101,
+  "sim_log": [
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 0.0,
+        "battery_wh": 400.0,
+        "current_site_id": "mission_bay",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "status": "ground"
+      },
+      "alerts": [],
+      "battery_pct": 100.0,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 250.0,
+      "current_plan": [],
+      "event": "briefing",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": false,
+      "last_action": "briefing",
+      "last_result": {},
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": null,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "pending",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 3.229,
+      "overrides": [],
+      "payload_released": false,
+      "rng_draws": 0,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 336012731074177136118450202477467702898
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 0.0,
+      "terminal_reason": null,
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    },
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 0.0,
+        "battery_wh": 400.0,
+        "current_site_id": "mission_bay",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "status": "ground"
+      },
+      "alerts": [],
+      "battery_pct": 100.0,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 250.0,
+      "current_plan": [],
+      "event": "get_weather",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": false,
+      "last_action": "get_weather",
+      "last_result": {
+        "current": {
+          "dir_deg_from": 277.0,
+          "speed_kt": 13.5
+        },
+        "forecast": [
+          {
+            "dir_deg_from": 318.2,
+            "minutes_ahead": 15,
+            "speed_kt": 23.3
+          },
+          {
+            "dir_deg_from": 316.8,
+            "minutes_ahead": 30,
+            "speed_kt": 23.5
+          }
+        ],
+        "gust_front": {
+          "dir_shift_deg": 58.5,
+          "forecast_error_min": -7.0,
+          "forecast_eta_min": 18.8,
+          "speed_delta_kt": 15.6,
+          "speed_kt": 27.6
+        },
+        "location": {
+          "alt_ft": 300.0,
+          "lat": 37.7707,
+          "lon": -122.3869
+        },
+        "ok": true
+      },
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": null,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "pending",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 3.229,
+      "overrides": [],
+      "payload_released": false,
+      "rng_draws": 0,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 336012731074177136118450202477467702898
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 10.0,
+      "terminal_reason": null,
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    },
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 0.0,
+        "battery_wh": 400.0,
+        "current_site_id": "mission_bay",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "status": "ground"
+      },
+      "alerts": [],
+      "battery_pct": 100.0,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 250.0,
+      "current_plan": [],
+      "event": "get_airspace",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": false,
+      "last_action": "get_airspace",
+      "last_result": {
+        "ok": true,
+        "route_conflicts": [],
+        "route_errors": [],
+        "route_warnings": [],
+        "zones": [
+          {
+            "authorization_required": true,
+            "ceiling_ft": 3000.0,
+            "class": "B",
+            "floor_ft": 0.0,
+            "name": "SFO Class B Core",
+            "polygon": [
+              [
+                37.585,
+                -122.425
+              ],
+              [
+                37.65,
+                -122.425
+              ],
+              [
+                37.665,
+                -122.365
+              ],
+              [
+                37.62,
+                -122.335
+              ],
+              [
+                37.57,
+                -122.365
+              ]
+            ],
+            "zone_id": "sfo_b_core"
+          },
+          {
+            "authorization_required": true,
+            "ceiling_ft": 3000.0,
+            "class": "B",
+            "floor_ft": 1500.0,
+            "name": "SFO Class B North Shelf",
+            "polygon": [
+              [
+                37.65,
+                -122.5
+              ],
+              [
+                37.735,
+                -122.5
+              ],
+              [
+                37.735,
+                -122.36
+              ],
+              [
+                37.665,
+                -122.365
+              ]
+            ],
+            "zone_id": "sfo_b_north_shelf"
+          },
+          {
+            "authorization_required": false,
+            "ceiling_ft": 2500.0,
+            "class": "C",
+            "floor_ft": 0.0,
+            "name": "OAK Class C Core",
+            "polygon": [
+              [
+                37.69,
+                -122.245
+              ],
+              [
+                37.76,
+                -122.245
+              ],
+              [
+                37.775,
+                -122.185
+              ],
+              [
+                37.715,
+                -122.155
+              ],
+              [
+                37.675,
+                -122.19
+              ]
+            ],
+            "zone_id": "oak_c_core"
+          },
+          {
+            "authorization_required": false,
+            "ceiling_ft": 2500.0,
+            "class": "D",
+            "floor_ft": 0.0,
+            "name": "San Carlos Class D",
+            "polygon": [
+              [
+                37.495,
+                -122.29
+              ],
+              [
+                37.555,
+                -122.29
+              ],
+              [
+                37.575,
+                -122.235
+              ],
+              [
+                37.53,
+                -122.19
+              ],
+              [
+                37.485,
+                -122.22
+              ]
+            ],
+            "zone_id": "sql_d"
+          },
+          {
+            "authorization_required": true,
+            "ceiling_ft": 2000.0,
+            "class": "NO_FLY",
+            "floor_ft": 0.0,
+            "name": "Oakland Coliseum event no-fly polygon",
+            "polygon": [
+              [
+                37.7465,
+                -122.2075
+              ],
+              [
+                37.757,
+                -122.2075
+              ],
+              [
+                37.757,
+                -122.193
+              ],
+              [
+                37.7465,
+                -122.193
+              ]
+            ],
+            "zone_id": "oakland_coliseum_no_fly"
+          }
+        ]
+      },
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": null,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "pending",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 3.229,
+      "overrides": [],
+      "payload_released": false,
+      "rng_draws": 0,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 336012731074177136118450202477467702898
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 20.0,
+      "terminal_reason": null,
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    },
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 300.0,
+        "battery_wh": 377.02132020922943,
+        "current_site_id": null,
+        "lat": 37.823,
+        "lon": -122.371,
+        "status": "holding"
+      },
+      "alerts": [],
+      "battery_pct": 94.26,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 300.0,
+      "current_plan": [
+        {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        }
+      ],
+      "event": "file_flight_plan",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": false,
+      "last_action": "file_flight_plan",
+      "last_result": {
+        "ok": true,
+        "segments": [
+          {
+            "distance_nm": 3.229,
+            "duration_s": 319.5,
+            "energy_wh": 22.98,
+            "execution_multiplier": 1.015,
+            "from": {
+              "alt_ft": 0.0,
+              "lat": 37.7707,
+              "lon": -122.3869
+            },
+            "groundspeed_kt": 36.93,
+            "to": {
+              "alt_ft": 300.0,
+              "lat": 37.823,
+              "lon": -122.371
+            },
+            "track_deg": 13.5,
+            "wind": {
+              "dir_deg_from": 275.5,
+              "speed_kt": 13.9
+            }
+          }
+        ],
+        "telemetry": {
+          "acknowledged_alerts": [],
+          "active_failsafe": null,
+          "aircraft": {
+            "alt_ft": 300.0,
+            "battery_pct": 94.26,
+            "battery_wh": 377.02,
+            "lat": 37.823,
+            "lon": -122.371,
+            "status": "holding"
+          },
+          "alerts": [],
+          "last_action": "file_flight_plan",
+          "last_result_summary": {
+            "ok": true
+          },
+          "mission": {
+            "completed_time_min": 5.99,
+            "description": "Inspect the Treasure Island shoreline marker.",
+            "mission_id": "T0-treasure-island",
+            "sla_min": 35.0,
+            "status": "completed",
+            "target": {
+              "lat": 37.823,
+              "lon": -122.371,
+              "name": "Treasure Island inspection point"
+            }
+          },
+          "ok": true,
+          "overrides": [],
+          "payload_released": false,
+          "sim_time_min": 5.99,
+          "weather": {
+            "gust_front": {
+              "dir_shift_deg": 58.5,
+              "forecast_error_min": -7.0,
+              "forecast_eta_min": 18.8,
+              "speed_delta_kt": 15.6,
+              "speed_kt": 27.6
+            },
+            "wind_dir_deg_from": 274.0,
+            "wind_speed_kt": 14.5
+          }
+        },
+        "warnings": []
+      },
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": 359.5275483371171,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "completed",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 0.0,
+      "overrides": [],
+      "payload_released": false,
+      "rng_draws": 1,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 174232728751024098566614630221735997451
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 359.5275483371171,
+      "terminal_reason": null,
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    },
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 300.0,
+        "battery_wh": 377.02132020922943,
+        "current_site_id": null,
+        "lat": 37.823,
+        "lon": -122.371,
+        "status": "holding"
+      },
+      "alerts": [],
+      "battery_pct": 94.26,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 300.0,
+      "current_plan": [
+        {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        }
+      ],
+      "event": "release_payload",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": false,
+      "last_action": "release_payload",
+      "last_result": {
+        "mission": {
+          "completed_time_s": 359.5275483371171,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "failure_reason": null,
+          "launch_site_id": "mission_bay",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          },
+          "value": 1.0
+        },
+        "ok": true,
+        "telemetry": {
+          "acknowledged_alerts": [],
+          "active_failsafe": null,
+          "aircraft": {
+            "alt_ft": 300.0,
+            "battery_pct": 94.26,
+            "battery_wh": 377.02,
+            "lat": 37.823,
+            "lon": -122.371,
+            "status": "holding"
+          },
+          "alerts": [],
+          "last_action": "release_payload",
+          "last_result_summary": {
+            "ok": true,
+            "segment_count": 1,
+            "warnings": []
+          },
+          "mission": {
+            "completed_time_min": 5.99,
+            "description": "Inspect the Treasure Island shoreline marker.",
+            "mission_id": "T0-treasure-island",
+            "sla_min": 35.0,
+            "status": "completed",
+            "target": {
+              "lat": 37.823,
+              "lon": -122.371,
+              "name": "Treasure Island inspection point"
+            }
+          },
+          "ok": true,
+          "overrides": [],
+          "payload_released": true,
+          "sim_time_min": 6.33,
+          "weather": {
+            "gust_front": {
+              "dir_shift_deg": 58.5,
+              "forecast_error_min": -7.0,
+              "forecast_eta_min": 18.8,
+              "speed_delta_kt": 15.6,
+              "speed_kt": 27.6
+            },
+            "wind_dir_deg_from": 274.0,
+            "wind_speed_kt": 14.5
+          }
+        }
+      },
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": 359.5275483371171,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "completed",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 0.0,
+      "overrides": [],
+      "payload_released": true,
+      "rng_draws": 1,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 174232728751024098566614630221735997451
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 379.5275483371171,
+      "terminal_reason": null,
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    },
+    {
+      "acknowledged_alerts": [],
+      "active_failsafe": null,
+      "aircraft": {
+        "alt_ft": 0.0,
+        "battery_wh": 319.7622909980961,
+        "current_site_id": "mission_bay",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "status": "landed"
+      },
+      "alerts": [],
+      "battery_pct": 79.94,
+      "current_airspeed_kt": 35.0,
+      "current_altitude_target_ft": 300.0,
+      "current_plan": [
+        {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        }
+      ],
+      "event": "command_rtl",
+      "hold_until_s": null,
+      "home_site_id": "mission_bay",
+      "is_terminal": true,
+      "last_action": "command_rtl",
+      "last_result": {
+        "landing_site": {
+          "kind": "recovery",
+          "lat": 37.7707,
+          "lon": -122.3869,
+          "name": "Mission Bay Pad",
+          "site_id": "mission_bay"
+        },
+        "ok": true,
+        "segment": {
+          "distance_nm": 3.229,
+          "duration_s": 359.0,
+          "energy_wh": 57.26,
+          "execution_multiplier": 1.0146,
+          "from": {
+            "alt_ft": 300.0,
+            "lat": 37.823,
+            "lon": -122.371
+          },
+          "groundspeed_kt": 32.85,
+          "to": {
+            "alt_ft": 0.0,
+            "lat": 37.7707,
+            "lon": -122.3869
+          },
+          "track_deg": 193.5,
+          "wind": {
+            "dir_deg_from": 274.8,
+            "speed_kt": 14.2
+          }
+        },
+        "telemetry": {
+          "acknowledged_alerts": [],
+          "active_failsafe": null,
+          "aircraft": {
+            "alt_ft": 0.0,
+            "battery_pct": 79.94,
+            "battery_wh": 319.76,
+            "lat": 37.7707,
+            "lon": -122.3869,
+            "status": "landed"
+          },
+          "alerts": [],
+          "last_action": "command_rtl",
+          "last_result_summary": {
+            "ok": true
+          },
+          "mission": {
+            "completed_time_min": 5.99,
+            "description": "Inspect the Treasure Island shoreline marker.",
+            "mission_id": "T0-treasure-island",
+            "sla_min": 35.0,
+            "status": "completed",
+            "target": {
+              "lat": 37.823,
+              "lon": -122.371,
+              "name": "Treasure Island inspection point"
+            }
+          },
+          "ok": true,
+          "overrides": [],
+          "payload_released": true,
+          "sim_time_min": 12.64,
+          "weather": {
+            "gust_front": {
+              "dir_shift_deg": 58.5,
+              "forecast_error_min": -7.0,
+              "forecast_eta_min": 18.8,
+              "speed_delta_kt": 15.6,
+              "speed_kt": 27.6
+            },
+            "wind_dir_deg_from": 317.1,
+            "wind_speed_kt": 22.3
+          }
+        }
+      },
+      "lost_link_plan": "return_home",
+      "mission": {
+        "completed_time_s": 359.5275483371171,
+        "description": "Inspect the Treasure Island shoreline marker.",
+        "failure_reason": null,
+        "launch_site_id": "mission_bay",
+        "mission_id": "T0-treasure-island",
+        "sla_min": 35.0,
+        "status": "completed",
+        "target": {
+          "lat": 37.823,
+          "lon": -122.371,
+          "name": "Treasure Island inspection point"
+        },
+        "value": 1.0
+      },
+      "mission_distance_to_target_nm": 3.229,
+      "overrides": [],
+      "payload_released": true,
+      "rng_draws": 2,
+      "rng_state": {
+        "bit_generator": "PCG64",
+        "has_uint32": 1,
+        "state": {
+          "inc": 287896369054363243330570147588121237329,
+          "state": 230414765458416414191580097524641668168
+        },
+        "uinteger": 3370713578
+      },
+      "scenario_id": "T0-treasure-island",
+      "seed": 101,
+      "sim_time_s": 758.5533670183539,
+      "terminal_reason": "aircraft_landed_mission_completed",
+      "wind": {
+        "base_dir_deg_from": 294.91792550494984,
+        "base_speed_kt": 9.594210333415731,
+        "blobs": [
+          {
+            "center_lat": 37.786511274091765,
+            "center_lon": -122.46755214746138,
+            "dir_delta_deg": 44.31978536142833,
+            "drift_bearing_deg": 350.34365326784183,
+            "drift_speed_kt": 7.143340630291837,
+            "radius_nm": 13.381805491383314,
+            "speed_delta_kt": -0.26620045822320304
+          },
+          {
+            "center_lat": 37.87219834717125,
+            "center_lon": -122.29359669592363,
+            "dir_delta_deg": -56.30334353387884,
+            "drift_bearing_deg": 206.5077085732829,
+            "drift_speed_kt": 9.464315607144483,
+            "radius_nm": 9.7684841698056,
+            "speed_delta_kt": 6.63237664007636
+          }
+        ],
+        "gust_front": {
+          "anchor_lat": 37.75,
+          "anchor_lon": -122.375,
+          "dir_shift_deg": 58.546785135515556,
+          "eta_error_s": -422.7666775222834,
+          "forecast_eta_s": 1125.8593206923708,
+          "movement_bearing_deg": 80.82170547676056,
+          "orientation_deg": 9.118381167624307,
+          "speed_delta_kt": 15.5520285394721,
+          "speed_kt": 27.61369862223755
+        }
+      }
+    }
+  ],
+  "sim_state": {
+    "acknowledged_alerts": [],
+    "active_failsafe": null,
+    "aircraft": {
+      "alt_ft": 0.0,
+      "battery_wh": 319.7622909980961,
+      "current_site_id": "mission_bay",
+      "lat": 37.7707,
+      "lon": -122.3869,
+      "status": "landed"
+    },
+    "alerts": [],
+    "current_airspeed_kt": 35.0,
+    "current_altitude_target_ft": 300.0,
+    "current_plan": [
+      {
+        "lat": 37.823,
+        "lon": -122.371,
+        "name": "Treasure Island inspection point"
+      }
+    ],
+    "hold_until_s": null,
+    "home_site_id": "mission_bay",
+    "is_terminal": true,
+    "last_action": "command_rtl",
+    "last_result": {
+      "landing_site": {
+        "kind": "recovery",
+        "lat": 37.7707,
+        "lon": -122.3869,
+        "name": "Mission Bay Pad",
+        "site_id": "mission_bay"
+      },
+      "ok": true,
+      "segment": {
+        "distance_nm": 3.229,
+        "duration_s": 359.0,
+        "energy_wh": 57.26,
+        "execution_multiplier": 1.0146,
+        "from": {
+          "alt_ft": 300.0,
+          "lat": 37.823,
+          "lon": -122.371
+        },
+        "groundspeed_kt": 32.85,
+        "to": {
+          "alt_ft": 0.0,
+          "lat": 37.7707,
+          "lon": -122.3869
+        },
+        "track_deg": 193.5,
+        "wind": {
+          "dir_deg_from": 274.8,
+          "speed_kt": 14.2
+        }
+      },
+      "telemetry": {
+        "acknowledged_alerts": [],
+        "active_failsafe": null,
+        "aircraft": {
+          "alt_ft": 0.0,
+          "battery_pct": 79.94,
+          "battery_wh": 319.76,
+          "lat": 37.7707,
+          "lon": -122.3869,
+          "status": "landed"
+        },
+        "alerts": [],
+        "last_action": "command_rtl",
+        "last_result_summary": {
+          "ok": true
+        },
+        "mission": {
+          "completed_time_min": 5.99,
+          "description": "Inspect the Treasure Island shoreline marker.",
+          "mission_id": "T0-treasure-island",
+          "sla_min": 35.0,
+          "status": "completed",
+          "target": {
+            "lat": 37.823,
+            "lon": -122.371,
+            "name": "Treasure Island inspection point"
+          }
+        },
+        "ok": true,
+        "overrides": [],
+        "payload_released": true,
+        "sim_time_min": 12.64,
+        "weather": {
+          "gust_front": {
+            "dir_shift_deg": 58.5,
+            "forecast_error_min": -7.0,
+            "forecast_eta_min": 18.8,
+            "speed_delta_kt": 15.6,
+            "speed_kt": 27.6
+          },
+          "wind_dir_deg_from": 317.1,
+          "wind_speed_kt": 22.3
+        }
+      }
+    },
+    "lost_link_plan": "return_home",
+    "mission": {
+      "completed_time_s": 359.5275483371171,
+      "description": "Inspect the Treasure Island shoreline marker.",
+      "failure_reason": null,
+      "launch_site_id": "mission_bay",
+      "mission_id": "T0-treasure-island",
+      "sla_min": 35.0,
+      "status": "completed",
+      "target": {
+        "lat": 37.823,
+        "lon": -122.371,
+        "name": "Treasure Island inspection point"
+      },
+      "value": 1.0
+    },
+    "overrides": [],
+    "payload_released": true,
+    "rng_draws": 2,
+    "rng_state": {
+      "bit_generator": "PCG64",
+      "has_uint32": 1,
+      "state": {
+        "inc": 287896369054363243330570147588121237329,
+        "state": 230414765458416414191580097524641668168
+      },
+      "uinteger": 3370713578
+    },
+    "scenario_id": "T0-treasure-island",
+    "seed": 101,
+    "sim_time_s": 758.5533670183539,
+    "terminal_reason": "aircraft_landed_mission_completed",
+    "wind": {
+      "base_dir_deg_from": 294.91792550494984,
+      "base_speed_kt": 9.594210333415731,
+      "blobs": [
+        {
+          "center_lat": 37.786511274091765,
+          "center_lon": -122.46755214746138,
+          "dir_delta_deg": 44.31978536142833,
+          "drift_bearing_deg": 350.34365326784183,
+          "drift_speed_kt": 7.143340630291837,
+          "radius_nm": 13.381805491383314,
+          "speed_delta_kt": -0.26620045822320304
+        },
+        {
+          "center_lat": 37.87219834717125,
+          "center_lon": -122.29359669592363,
+          "dir_delta_deg": -56.30334353387884,
+          "drift_bearing_deg": 206.5077085732829,
+          "drift_speed_kt": 9.464315607144483,
+          "radius_nm": 9.7684841698056,
+          "speed_delta_kt": 6.63237664007636
+        }
+      ],
+      "gust_front": {
+        "anchor_lat": 37.75,
+        "anchor_lon": -122.375,
+        "dir_shift_deg": 58.546785135515556,
+        "eta_error_s": -422.7666775222834,
+        "forecast_eta_s": 1125.8593206923708,
+        "movement_bearing_deg": 80.82170547676056,
+        "orientation_deg": 9.118381167624307,
+        "speed_delta_kt": 15.5520285394721,
+        "speed_kt": 27.61369862223755
+      }
+    }
+  }
+}

@@ -17,10 +17,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 2 implemented: five T0 scenarios, three tools, static Bay
-  Area world data, route geometry checks, calibrated analytic energy, sim
-  logging, and autopilot-owned `LOW_BATT_RTL` / `GEOFENCE_HOLD` failsafes.
-  Day 3+ adds seeded wind, the full console, richer events, and reward v0.
+- **Status**: Day 3 implemented: five T0 scenarios, static Bay Area world
+  data, seeded wind with perturbations/gust fronts/altitude shear, calibrated
+  analytic energy, full SPEC §3.2 console tools, sim logging, and
+  autopilot-owned `LOW_BATT_RTL` / `GEOFENCE_HOLD` failsafes. Day 4 adds reward
+  v0, baselines, and first frontier-model contact.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator, planned.
@@ -69,6 +70,8 @@ Notes:
   judgment, not low-level flight control or 3D collision physics.
 - Inspect or rebuild the static Day 2 world JSON with
   `uv run python scripts/build_world.py`.
+- Inspect the deterministic scripted rollout artifact at
+  `assets/rollouts/day3_scripted_rollout.json`.
 
 ### Taskset Config
 Planned fields:
@@ -78,6 +81,8 @@ Planned fields:
 | `tier` | string | `mixed` | Scenario tier selection: `T0`, `T1`, `T2`, `T3`, or `mixed`. |
 | `seed` | int | `0` | Base seed for deterministic scenario generation. |
 | `max_examples` | int | `-1` | Limit on dataset size; use `-1` for all generated examples. |
+| `wind_enabled` | bool | `true` | Enable seeded Day 3 wind field and altitude shear. |
+| `gust_front_probability` | float | `0.5` | Probability that an episode includes a gust front. |
 
 ### Harness Config
 Planned fields:

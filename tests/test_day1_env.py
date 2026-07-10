@@ -42,8 +42,22 @@ def test_load_environment_exposes_day1_dataset_and_tools() -> None:
     assert len(env.get_eval_dataset()) == 5
     assert [tool.name for tool in env.tool_defs or []] == [
         "get_telemetry",
+        "get_weather",
+        "get_airspace",
+        "get_mission_status",
+        "get_sites",
         "file_flight_plan",
+        "amend_route",
+        "set_altitude",
+        "set_speed",
+        "hold",
+        "resume",
         "command_rtl",
+        "land_now",
+        "release_payload",
+        "abort_mission",
+        "override_failsafe",
+        "acknowledge",
     ]
 
 
@@ -205,10 +219,91 @@ def test_day2_low_battery_triggers_autonomous_rtl() -> None:
     assert state["sim_state"]["terminal_reason"] == "aircraft_landed_mission_completed"
 
 
+def test_day3_wind_is_seeded_and_has_altitude_shear() -> None:
+    sim_a = uav_operator._build_sim(seed=21, scenario_index=0, gust_front_probability=1.0)
+    sim_b = uav_operator._build_sim(seed=21, scenario_index=0, gust_front_probability=1.0)
+    sim_c = uav_operator._build_sim(seed=22, scenario_index=0, gust_front_probability=1.0)
+
+    low_a = uav_operator.wind_at(37.75, -122.35, 100.0, 900.0, sim_a.wind)
+    low_b = uav_operator.wind_at(37.75, -122.35, 100.0, 900.0, sim_b.wind)
+    low_c = uav_operator.wind_at(37.75, -122.35, 100.0, 900.0, sim_c.wind)
+    high_a = uav_operator.wind_at(37.75, -122.35, 1100.0, 900.0, sim_a.wind)
+    front_late = uav_operator.wind_at(37.75, -122.35, 300.0, 7200.0, sim_a.wind)
+
+    assert sim_a.wind == sim_b.wind
+    assert sim_a.wind != sim_c.wind
+    assert low_a == low_b
+    assert low_a != low_c
+    assert high_a[1] > low_a[1]
+    assert high_a[0] != low_a[0]
+    assert front_late != low_a
+
+
+def test_day3_console_tools_charge_time_and_return_structured_state() -> None:
+    env, state = _setup_state(seed=13, scenario_index=1)
+
+    weather = _run_tool(env, state, "get_weather", {"alt_ft": 300})
+    weather_payload = json.loads(weather[0].content)
+    assert weather_payload["ok"] is True
+    assert "current" in weather_payload
+    assert state["sim_state"]["sim_time_s"] == uav_operator.READ_TOOL_LATENCY_S
+
+    sites = _run_tool(env, state, "get_sites", {})
+    assert json.loads(sites[0].content)["nearest_site_id"] == state["sim_state"]["home_site_id"]
+
+    altitude = _run_tool(env, state, "set_altitude", {"ft": 300})
+    assert json.loads(altitude[0].content)["alt_ft"] == 300
+
+    speed = _run_tool(env, state, "set_speed", {"kt": 32})
+    assert json.loads(speed[0].content)["airspeed_kt"] == 32
+
+    before_hold = state["sim_state"]["sim_time_s"]
+    hold = _run_tool(env, state, "hold", {"minutes": 1})
+    assert json.loads(hold[0].content)["held_minutes"] == 1
+    assert state["sim_state"]["sim_time_s"] == before_hold + uav_operator.TOOL_LATENCY_S + 60.0
+
+
+def test_day3_override_and_acknowledge_clear_active_geofence_failsafe() -> None:
+    env, state = _setup_state(seed=14, scenario_index=3)
+
+    _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [{"lat": 37.62, "lon": -122.39, "name": "SFO core test"}],
+            "alt_ft": 250,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+    assert state["sim_state"]["active_failsafe"] == "GEOFENCE_HOLD"
+
+    ack = _run_tool(env, state, "acknowledge", {"alert_id": "GEOFENCE_HOLD"})
+    assert json.loads(ack[0].content)["acknowledged_alerts"] == ["GEOFENCE_HOLD"]
+
+    override = _run_tool(
+        env,
+        state,
+        "override_failsafe",
+        {
+            "id": "GEOFENCE_HOLD",
+            "justification_code": "AIRSPACE_AUTH_CONFIRMED",
+        },
+    )
+    assert json.loads(override[0].content)["ok"] is True
+    assert state["sim_state"]["active_failsafe"] is None
+    assert state["sim_state"]["overrides"][-1]["id"] == "GEOFENCE_HOLD"
+
+
 def test_same_seed_and_action_sequence_are_deterministic() -> None:
     def run_sequence() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         env, state = _setup_state(seed=12, scenario_index=2)
         target = state["sim_state"]["mission"]["target"]
+        _run_tool(env, state, "get_weather", {"alt_ft": 300})
+        _run_tool(env, state, "get_airspace", {"route": [target], "alt_ft": 300})
+        _run_tool(env, state, "set_altitude", {"ft": 300})
+        _run_tool(env, state, "set_speed", {"kt": 35})
         _run_tool(
             env,
             state,
