@@ -379,6 +379,11 @@ Wind is seeded, spatially varying, altitude-dependent, and may include a gust
 front forecast with error. The simulator validates route geometry, energy,
 airspace, and autopilot failsafes.
 
+You control the operation exclusively through tool calls.  Describing an action 
+does not execute it. At every nonterminal turn, call an appropriate tool. If the 
+route is blocked or unsafe, use the available tools to hold, reroute, return, or 
+abort; do not merely state your intention.
+
 Reward comes only from simulator state: complete the mission value and bring
 the aircraft down. Natural-language claims do not score.
 """
