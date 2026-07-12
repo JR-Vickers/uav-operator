@@ -1,0 +1,60 @@
+{
+  "interval": "95% normal confidence interval of rollout rewards",
+  "series": {
+    "openai/gpt-4.1-nano": {
+      "T0": {
+        "ci95_high": 0.9647295183658452,
+        "ci95_low": 0.8334869174821405,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 0,
+        "mean_reward": 0.8991082179239929,
+        "mean_turns": 4.8,
+        "missions_completed": 10,
+        "n": 10,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/f32c2f03",
+        "run_id": "f32c2f03"
+      },
+      "T1": {
+        "ci95_high": 0.2884265140673856,
+        "ci95_low": -0.019981406579691413,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 6,
+        "mean_reward": 0.1342225537438471,
+        "mean_turns": 15.066666666666666,
+        "missions_completed": 7,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/f2cef9f9",
+        "run_id": "f2cef9f9"
+      },
+      "T2": {
+        "ci95_high": -0.11912749976858036,
+        "ci95_low": -0.154205833564753,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 2,
+        "mean_reward": -0.1366666666666667,
+        "mean_turns": 11.1,
+        "missions_completed": 0,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/ea07497e",
+        "run_id": "ea07497e"
+      },
+      "T3": {
+        "ci95_high": -0.16669894889127923,
+        "ci95_low": -0.23102998883765852,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 6,
+        "mean_reward": -0.19886446886446887,
+        "mean_turns": 14.133333333333333,
+        "missions_completed": 0,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/ef609452",
+        "run_id": "ef609452"
+      }
+    }
+  },
+  "title": "uav-operator Day 5 frontier calibration"
+}

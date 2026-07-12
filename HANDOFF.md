@@ -1,5 +1,33 @@
 # HANDOFF.md
 
+## 2026-07-12 Day 5 complete: frontier calibration curve
+
+Changed:
+- Built the primary Day 5 curve from four saved, zero-provider-error
+  GPT-4.1-nano dev runs and committed the PNG plus a machine-readable summary.
+- Added per-tier 95% confidence intervals, rollout-count annotations, mission
+  completion counts, run IDs, and saved-results provenance.
+- Recorded the curve and interpretation in README; marked Day 5 complete in
+  PLAN. Laguna is intentionally excluded because its T0/T1 coverage is
+  incomplete and its T2/T3 runs include provider errors.
+- Reworked `scripts/plot_day5_scores.py` to derive statistics directly from
+  saved `vf-eval` metadata/results rather than accepting hand-entered means.
+
+Calibration:
+- T0 `f32c2f03`: 0.899 mean reward, 95% CI [0.833, 0.965], 10/10 complete.
+- T1 `f2cef9f9`: 0.134 mean reward, 95% CI [-0.020, 0.288], 7/30 complete.
+- T2 `ea07497e`: -0.137 mean reward, 95% CI [-0.154, -0.119], 0/30 complete.
+- T3 `ef609452`: -0.199 mean reward, 95% CI [-0.231, -0.167], 0/30 complete.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 21 tests.
+- `git diff --check` passes.
+
+Next action:
+- Begin Day 6 red-team round 1 and freeze the rollout-JSON schema before
+  renderer work.
+
 ## 2026-07-12 ground-state loop pricing
 
 Changed:
@@ -86,7 +114,7 @@ Verified:
 
 Broken / not done:
 - The Day 4 live-frontier postmortem and Day 5 final live calibration with
-  `poolside/laguna-m.1` and `gpt-4.1` have not been run in this session.
+  `poolside/laguna-m.1` and `gpt-5-nano` have not been run in this session.
 - No final frontier plot is committed until those saved evaluation results exist.
 
 Next action:

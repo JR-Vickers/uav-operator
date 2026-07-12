@@ -39,13 +39,18 @@ Fallback if behind: cut TRAFFIC_ADVISORY + PAYLOAD_ISSUE events permanently.
 
 ## Phase 2 — a task worth training on (Days 5–9)
 
-**Day 5 — T2/T3 generation + calibration.** Composed-event scenarios,
+**Day 5 — T2/T3 generation + calibration. COMPLETE.** Composed-event scenarios,
 feasibility solver check, stratified dataset v0 (300/60). Run frontier
 baselines across tiers; plot tier-vs-score. Target shape: T0 ≈ ceiling, T3
 clearly below ceiling with variance. Regenerate dials until shape appears.
 Include the Day 4 postmortem here: repeated geofence filing / failed override
 loops should get a regression test and a sharper penalty or clearer interrupt
 response before T2/T3 work continues.
+
+Closed with a zero-provider-error GPT-4.1-nano curve: T0 `0.899` (n=10),
+T1 `0.134` (n=30), T2 `-0.137` (n=30), and T3 `-0.199` (n=30), with 95%
+confidence intervals in the committed calibration artifact. Proceed to Day 6;
+do not tune the generator against final-eval seeds.
 
 **Day 6 — red-team round 1.** Adversarial prompting runs ("maximize score by
 any means"), exploit hunting per SPEC §8 list, fixes + regression tests,

@@ -17,12 +17,13 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 5 implemented: seeded T0-T3 generation, composed-event
+- **Status**: Day 5 complete: seeded T0-T3 generation, composed-event
   feasibility checks, a 300/60/60 train/dev/final-eval split, loop-regression
   pricing with structured ground-stall warnings, TFR-preserving
   outbound/recovery solver admission, scripted calibration, deterministic sim
-  logging, canonical hard-safety outcome scoring, and the full SPEC §3.2
-  console. Live frontier calibration and renderer remain next.
+  logging, canonical hard-safety outcome scoring, the full SPEC §3.2 console,
+  and a clean GPT-4.1-nano frontier calibration curve. Day 6 red-team round 1
+  is next.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -86,12 +87,36 @@ Notes:
 - Run local baselines with
   `uv run python scripts/baselines.py --policy both --episodes 20 --tier all`.
 - Run Day 5 scripted calibration with
-  `uv run python scripts/day5_calibration.py`, then plot it with
-  `uv run python scripts/plot_day5_scores.py outputs/day5/scripted_calibration.json`.
+  `uv run python scripts/day5_calibration.py`. Build a frontier plot by passing
+  saved `vf-eval` run directories to `scripts/plot_day5_scores.py`.
 - Run each final frontier tier with fixed sampling, for example:
   `prime --plain eval run uav-operator -m poolside/laguna-m.1 -n 15 -r 2 -t 512 -T 0.2 --save-results --state-columns sim_state,sim_log`.
-  Repeat for `gpt-4.1` and record the printed run ID/results path; use taskset
+  Repeat for `gpt-5-nano` and record the printed run ID/results path; use taskset
   tier overrides for `T0` through `T3`.
+
+### Day 5 calibration
+
+![GPT-4.1-nano reward by curriculum tier](assets/evals/day5_tier_scores.png)
+
+The primary calibration uses GPT-4.1-nano on the dev split with fixed
+sampling and no provider errors. Error bars are 95% normal confidence
+intervals over rollout rewards; `n` is annotated on every point.
+
+| Tier | Mean reward | 95% CI | Missions completed | Run ID |
+| --- | ---: | ---: | ---: | --- |
+| T0 | 0.899 | [0.833, 0.965] | 10/10 | `f32c2f03` |
+| T1 | 0.134 | [-0.020, 0.288] | 7/30 | `f2cef9f9` |
+| T2 | -0.137 | [-0.154, -0.119] | 0/30 | `ea07497e` |
+| T3 | -0.199 | [-0.231, -0.167] | 0/30 | `ef609452` |
+
+This is the intended curriculum shape: T0 is near ceiling, T1 is materially
+harder, and T2/T3 fall below zero as composed interrupts and turn-cap failures
+increase. The T1-T3 runs are especially interpretable because all 90 rollouts
+had no provider errors or hard-safety violations. Laguna T2/T3 is not plotted:
+its T0/T1 coverage is incomplete and its saved runs include provider errors,
+so it is not a like-for-like calibration series. The machine-readable results
+and provenance are in
+[`assets/evals/day5_frontier_calibration.json`](assets/evals/day5_frontier_calibration.json).
 
 ### Taskset Config
 Planned fields:
