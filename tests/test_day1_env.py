@@ -392,6 +392,14 @@ def test_day5_composed_scenarios_are_solver_checked() -> None:
             assert uav_operator._scenario_has_feasible_resolution(scenario, 200 + index)
 
 
+def test_day5_t2_dev_split_retains_feasible_tfr_scenarios() -> None:
+    scenarios = [uav_operator._scenario_for_index(index, seed=10_000 + index, tier="T2") for index in range(15)]
+    tfr_scenarios = [scenario for scenario in scenarios if any(event["type"] == "TFR_POPUP" for event in scenario["events"])]
+
+    assert len(tfr_scenarios) == 9
+    assert all(uav_operator._scenario_has_feasible_resolution(scenario, 10_000 + index) for index, scenario in enumerate(scenarios))
+
+
 def test_repeated_known_geofence_filing_and_invalid_override_cost_procedure() -> None:
     env, state = _setup_state(seed=9, scenario_index=3)
     conflicting_plan = {

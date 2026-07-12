@@ -897,10 +897,14 @@ def _day5_composed_events(seed: int, index: int, base: Mapping[str, Any], tier: 
     return events
 
 
-def _solver_route_candidates(launch: Site, target: Waypoint, events: Sequence[Mapping[str, Any]]) -> list[list[Waypoint]]:
-    """Return direct and deterministic TFR-detour candidates for feasibility checks."""
+def _solver_leg_candidates(
+    start: Waypoint,
+    end: Waypoint,
+    events: Sequence[Mapping[str, Any]],
+) -> list[list[Waypoint]]:
+    """Return direct and oriented rectangular detours for one solver leg."""
 
-    candidates = [[target]]
+    candidates: list[list[Waypoint]] = [[]]
     for event in events:
         if event.get("type") != "TFR_POPUP":
             continue
@@ -915,21 +919,44 @@ def _solver_route_candidates(launch: Site, target: Waypoint, events: Sequence[Ma
         max_lon = max(float(point[1]) for point in polygon)
         min_lon = min(float(point[1]) for point in polygon)
         clearance = 0.012
-        candidates.extend(
-            [
-                [
-                    Waypoint(max_lat + clearance, min_lon - clearance, "TFR north-west detour"),
-                    Waypoint(max_lat + clearance, max_lon + clearance, "TFR north-east detour"),
-                    target,
-                ],
-                [
-                    Waypoint(min_lat - clearance, min_lon - clearance, "TFR south-west detour"),
-                    Waypoint(min_lat - clearance, max_lon + clearance, "TFR south-east detour"),
-                    target,
-                ],
-            ]
+        north_west = Waypoint(max_lat + clearance, min_lon - clearance, "TFR north-west detour")
+        north_east = Waypoint(max_lat + clearance, max_lon + clearance, "TFR north-east detour")
+        south_west = Waypoint(min_lat - clearance, min_lon - clearance, "TFR south-west detour")
+        south_east = Waypoint(min_lat - clearance, max_lon + clearance, "TFR south-east detour")
+        sides = (
+            (north_west, north_east),
+            (south_west, south_east),
+            (south_west, north_west),
+            (south_east, north_east),
         )
+        detours: list[list[Waypoint]] = []
+        for first, second in sides:
+            forward_nm = (
+                haversine_nm(start.lat, start.lon, first.lat, first.lon)
+                + haversine_nm(second.lat, second.lon, end.lat, end.lon)
+            )
+            reverse_nm = (
+                haversine_nm(start.lat, start.lon, second.lat, second.lon)
+                + haversine_nm(first.lat, first.lon, end.lat, end.lon)
+            )
+            detours.append([first, second] if forward_nm <= reverse_nm else [second, first])
+        candidates.extend(detours)
     return candidates
+
+
+def _solver_route_candidates(
+    launch: Site,
+    target: Waypoint,
+    recovery: Site,
+    events: Sequence[Mapping[str, Any]],
+) -> list[list[Waypoint]]:
+    """Return complete outbound and recovery candidates for feasibility checks."""
+
+    launch_point = Waypoint(launch.lat, launch.lon, launch.name)
+    recovery_point = Waypoint(recovery.lat, recovery.lon, recovery.name)
+    outbound = _solver_leg_candidates(launch_point, target, events)
+    inbound = _solver_leg_candidates(target, recovery_point, events)
+    return [[*outbound_detour, target, *inbound_detour] for outbound_detour in outbound for inbound_detour in inbound]
 
 
 def _scenario_has_feasible_resolution(base: Mapping[str, Any], seed: int) -> bool:
@@ -955,9 +982,9 @@ def _scenario_has_feasible_resolution(base: Mapping[str, Any], seed: int) -> boo
         if event.get("type") == "TFR_POPUP"
     ]
     zones = tuple(zone for zone in (*AIRSPACE_ZONES, *dynamic_zones) if zone is not None)
-    for route in _solver_route_candidates(launch, target, events):
+    recovery = _nearest_site(target.lat, target.lon, tuple(closed_sites))
+    for route in _solver_route_candidates(launch, target, recovery, events):
         points = [Waypoint(launch.lat, launch.lon, launch.name), *route]
-        recovery = _nearest_site(target.lat, target.lon, tuple(closed_sites))
         points.append(Waypoint(recovery.lat, recovery.lon, recovery.name))
         energy_wh = BATTERY_WH * capacity_loss / 100.0 + BATTERY_WH * 0.08
         feasible = True

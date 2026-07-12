@@ -1,5 +1,25 @@
 # HANDOFF.md
 
+## 2026-07-12 TFR feasibility admission fix
+
+Changed:
+- Fixed the analytic feasibility solver to orient rectangular TFR detours for
+  the direction of travel and to validate detours on both the outbound and
+  recovery legs.
+- Added a regression proving that the 15-scenario T2 dev calibration set
+  retains all 9 seeded TFR compositions and that every scenario remains
+  solver-feasible.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 20 tests.
+- T2 dev retains 9 TFR scenarios; T3 dev retains 11; both have zero infeasible
+  scenarios across their 15 calibration seeds.
+
+Next action:
+- Add the ground-state telemetry/hold loop regression, then re-score saved T2
+  run `8a5e4f78` under the canonical hard-safety fix.
+
 ## 2026-07-12 T2 calibration reward audit
 
 Changed:
