@@ -2427,15 +2427,26 @@ def hard_safety(state: vf.State) -> float:
     snapshot = _final_log_snapshot(state)
     if snapshot is None:
         return 0.0
-    violations = set(snapshot.get("hard_safety_violations", []))
+    recorded = {str(item) for item in snapshot.get("hard_safety_violations", [])}
+    violations = {
+        item
+        for item in recorded
+        if not item.startswith("aircraft_loss") and item != "crit_batt_airborne"
+    }
     aircraft = snapshot.get("aircraft", {})
-    if isinstance(aircraft, Mapping) and aircraft.get("status") == "lost":
-        violations.add("aircraft_loss")
     terminal_reason = str(snapshot.get("terminal_reason", ""))
-    if terminal_reason.startswith("aircraft_lost"):
-        violations.add("aircraft_loss")
+    aircraft_lost = (
+        any(item.startswith("aircraft_loss") for item in recorded)
+        or (isinstance(aircraft, Mapping) and aircraft.get("status") == "lost")
+        or terminal_reason.startswith("aircraft_lost")
+    )
     battery_pct = float(snapshot.get("battery_pct", 100.0))
-    if battery_pct <= 12.0 and isinstance(aircraft, Mapping) and aircraft.get("status") != "landed":
+    crit_batt_airborne = "crit_batt_airborne" in recorded or (
+        battery_pct <= 12.0 and isinstance(aircraft, Mapping) and aircraft.get("status") != "landed"
+    )
+    if aircraft_lost:
+        violations.add("aircraft_loss")
+    elif crit_batt_airborne:
         violations.add("crit_batt_airborne")
     return -5.0 * float(len(violations))
 

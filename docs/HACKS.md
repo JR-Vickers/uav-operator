@@ -65,3 +65,17 @@ Current defense:
   violations, in addition to their simulated-time cost.
 - Regression tests verify that repeating the loop strictly worsens procedure
   reward and does not crash the environment.
+
+## Day 5: duplicate terminal safety labels
+
+Exploit / failure mode:
+- A single battery-depletion loss was represented by a detailed violation,
+  lost-aircraft status, and a critical-battery terminal condition. Reward
+  treated those three descriptions of one accident as three accidents.
+
+Current defense:
+- Hard-safety scoring canonicalizes terminal loss evidence to one
+  `aircraft_loss` category. A critical-battery-airborne penalty remains
+  distinct only when the aircraft was not also lost.
+- A regression recreates the saved T2 rollout's overlapping labels and
+  verifies that the single physical outcome costs exactly `-5.0`.

@@ -10,8 +10,4 @@ __pycache__/
 # Local virtualenvs
 .venv/
 
-# uv may create this during local test runs; the Hub wheel is defined by
-# pyproject.toml and intentionally stays lean for this environment.
-uv.lock
-
 /outputs

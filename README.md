@@ -19,8 +19,9 @@ the model's prose.
   `eval`
 - **Status**: Day 5 implemented: seeded T0-T3 generation, composed-event
   feasibility checks, a 300/60/60 train/dev/final-eval split, loop-regression
-  pricing, scripted calibration, deterministic sim logging, and the full SPEC
-  §3.2 console. Live frontier calibration and renderer remain next.
+  pricing, scripted calibration, deterministic sim logging, canonical
+  hard-safety outcome scoring, and the full SPEC §3.2 console. Live frontier
+  calibration and renderer remain next.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -42,6 +43,15 @@ the model's prose.
   only saved `sim_log` snapshots; model prose is inert.
 
 ### Quickstart
+Clone the repository and create the complete runtime and development
+environment from the locked `pyproject.toml` dependency set:
+
+```bash
+uv sync --locked --all-groups
+uv run ruff check .
+uv run pytest -q
+```
+
 Run a small local smoke evaluation:
 
 ```bash
@@ -76,7 +86,7 @@ Notes:
   `uv run python scripts/baselines.py --policy both --episodes 20 --tier all`.
 - Run Day 5 scripted calibration with
   `uv run python scripts/day5_calibration.py`, then plot it with
-  `uv run --with matplotlib python scripts/plot_day5_scores.py outputs/day5/scripted_calibration.json`.
+  `uv run python scripts/plot_day5_scores.py outputs/day5/scripted_calibration.json`.
 - Run each final frontier tier with fixed sampling, for example:
   `prime --plain eval run uav-operator -m poolside/laguna-m.1 -n 15 -r 2 -t 512 -T 0.2 --save-results --state-columns sim_state,sim_log`.
   Repeat for `gpt-4.1` and record the printed run ID/results path; use taskset

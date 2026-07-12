@@ -1,5 +1,29 @@
 # HANDOFF.md
 
+## 2026-07-12 T2 calibration reward audit
+
+Changed:
+- Canonicalized overlapping battery-depletion terminal evidence so one
+  physical aircraft loss receives one `-5.0` hard-safety penalty rather than
+  separate penalties for the detailed violation, lost status, and critical
+  battery condition.
+- Added a regression reproducing the overlap observed in saved Laguna T2 run
+  `8a5e4f78`, and documented the failure mode in `docs/HACKS.md`.
+- Made fresh-clone setup reproducible from `pyproject.toml` and the committed
+  `uv.lock`: the wheel keeps only `numpy` and `verifiers` at runtime, while
+  pytest, Ruff, msgpack, and matplotlib live in the development group.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 19 tests.
+- `git diff --check` passes.
+- `uv sync --locked --all-groups` succeeds, and the built wheel declares only
+  `numpy` and `verifiers` as runtime dependencies.
+
+Next action:
+- Investigate the T2 dev split's missing `TFR_POPUP` events and decide how to
+  make repeated ground-state read/hold loops terminate more informatively.
+
 ## 2026-07-10 Day 5 T2/T3 generation + calibration
 
 Changed:

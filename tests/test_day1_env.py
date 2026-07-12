@@ -460,6 +460,17 @@ def test_day4_reward_components_use_logged_sim_state_not_prose() -> None:
     assert breakdown["total"] < 0.0
 
 
+def test_hard_safety_deduplicates_terminal_battery_loss_labels() -> None:
+    _, state = _setup_state(seed=41, scenario_index=0, tier="T0")
+    snapshot = state["sim_log"][-1]
+    snapshot["aircraft"]["status"] = "lost"
+    snapshot["battery_pct"] = 0.0
+    snapshot["terminal_reason"] = "aircraft_lost_battery_depleted"
+    snapshot["hard_safety_violations"] = ["aircraft_loss:battery_depleted"]
+
+    assert uav_operator.hard_safety(state) == -5.0
+
+
 def test_day4_rulebook_baseline_beats_reckless_baseline() -> None:
     async def run() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         rulebook = await baselines.run_many("rulebook", seed=70, episodes=8, tier="mixed_day4")
