@@ -5,10 +5,16 @@ tags = ["uav", "drone-operations", "multi-turn", "tool-use", "train", "eval"]
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "datasets>=4.6.1",
     "numpy",
-    "pytest>=9.1.1",
     "verifiers>=0.1.15.dev189",
+]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10",
+    "msgpack>=1.1",
+    "pytest>=9.1",
+    "ruff>=0.12",
 ]
 
 [build-system]
