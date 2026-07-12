@@ -1,5 +1,25 @@
 # HANDOFF.md
 
+## 2026-07-12 ground-state loop pricing
+
+Changed:
+- Added a serialized ground no-progress streak covering telemetry, weather,
+  airspace, mission/site reads, and holds while a mission remains pending.
+- After three consecutive no-progress calls, the console returns a structured
+  warning and charges deterministic latency escalating from 30 to 120 seconds.
+  Mission/alert-resolving actions reset the streak; configuration churn does
+  not, and the simulator never chooses an action for the model.
+- Added exact warning, latency, hold, evasion, and reset regression coverage;
+  updated SPEC and `docs/HACKS.md`.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 21 tests.
+- `git diff --check` passes.
+
+Next action:
+- Re-score saved T2 run `8a5e4f78` under the canonical hard-safety fix.
+
 ## 2026-07-12 TFR feasibility admission fix
 
 Changed:

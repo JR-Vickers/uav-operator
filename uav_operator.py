@@ -24,6 +24,27 @@ TOOL_LATENCY_S = 20.0
 READ_TOOL_LATENCY_S = 10.0
 HIGH_IMPACT_TOOL_LATENCY_S = 30.0
 INVALID_ACTION_LATENCY_S = 30.0
+GROUND_STALL_WARNING_THRESHOLD = 3
+GROUND_STALL_LATENCY_STEP_S = 30.0
+GROUND_STALL_LATENCY_CAP_S = 120.0
+GROUND_NO_PROGRESS_TOOLS = {
+    "get_telemetry",
+    "get_weather",
+    "get_airspace",
+    "get_mission_status",
+    "get_sites",
+    "hold",
+}
+GROUND_PROGRESS_TOOLS = {
+    "file_flight_plan",
+    "amend_route",
+    "command_rtl",
+    "land_now",
+    "release_payload",
+    "abort_mission",
+    "acknowledge",
+    "override_failsafe",
+}
 LOW_BATT_RTL_THRESHOLD_PCT = 30.0
 LOW_BATT_RTL_THRESHOLD_WH = BATTERY_WH * LOW_BATT_RTL_THRESHOLD_PCT / 100.0
 BRIEFED_RESERVE_PCT = 20.0
@@ -197,6 +218,7 @@ class SimState:
     hold_until_s: float | None = None
     current_altitude_target_ft: float = 250.0
     current_airspeed_kt: float = DEFAULT_AIRSPEED_KT
+    ground_no_progress_streak: int = 0
     last_action: str = "briefing"
     last_result: dict[str, Any] = field(default_factory=dict)
     is_terminal: bool = False
@@ -1715,6 +1737,40 @@ def _charge_latency(sim: SimState, seconds: float, tool_name: str) -> dict[str, 
     return None
 
 
+def _price_ground_no_progress(sim: SimState, tool_name: str) -> dict[str, Any] | None:
+    """Price repeated ground-state observation/wait loops without choosing an action."""
+
+    is_ground_pending = sim.aircraft.status in {"ground", "landed"} and sim.mission.status == "pending"
+    if not is_ground_pending:
+        sim.ground_no_progress_streak = 0
+        return None
+    if tool_name in GROUND_PROGRESS_TOOLS:
+        sim.ground_no_progress_streak = 0
+        return None
+    if tool_name not in GROUND_NO_PROGRESS_TOOLS:
+        return None
+    sim.ground_no_progress_streak += 1
+    if sim.ground_no_progress_streak <= GROUND_STALL_WARNING_THRESHOLD:
+        return None
+    extra_latency_s = min(
+        GROUND_STALL_LATENCY_CAP_S,
+        GROUND_STALL_LATENCY_STEP_S
+        * (sim.ground_no_progress_streak - GROUND_STALL_WARNING_THRESHOLD),
+    )
+    sim.sim_time_s += extra_latency_s
+    _apply_due_events(sim)
+    return {
+        "code": "ground_no_progress_loop",
+        "streak": sim.ground_no_progress_streak,
+        "additional_latency_s": extra_latency_s,
+        "message": (
+            "The aircraft remains on the ground and the mission has not advanced. "
+            "Choose an operational action, continue waiting only for a specific timed condition, "
+            "or abort the mission."
+        ),
+    }
+
+
 def _route_validation(
     sim: SimState,
     waypoints: Sequence[Waypoint],
@@ -2407,6 +2463,9 @@ def _state_sim(state: vf.State) -> SimState:
         current_airspeed_kt=float(
             state["sim_state"].get("current_airspeed_kt", DEFAULT_AIRSPEED_KT)
         ),
+        ground_no_progress_streak=int(
+            state["sim_state"].get("ground_no_progress_streak", 0)
+        ),
         last_action=str(state["sim_state"].get("last_action", "briefing")),
         last_result=dict(state["sim_state"].get("last_result", {})),
         is_terminal=bool(state["sim_state"].get("is_terminal", False)),
@@ -2645,6 +2704,7 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
             raw_args = str(_tool_call_field(tool_call, "arguments") or "{}")
             try:
                 args = _parse_tool_args(raw_args)
+                ground_warning = _price_ground_no_progress(sim, name)
                 if name == "get_telemetry":
                     result = _execute_get_telemetry(sim, args)
                 elif name == "get_weather":
@@ -2687,6 +2747,9 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
                         "error": f"unknown_tool:{name}",
                         "available_tools": _available_tool_names(),
                     }
+                    sim.last_result = result
+                if ground_warning is not None:
+                    result["operator_warning"] = ground_warning
                     sim.last_result = result
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 sim.sim_time_s += INVALID_ACTION_LATENCY_S

@@ -19,10 +19,10 @@ the model's prose.
   `eval`
 - **Status**: Day 5 implemented: seeded T0-T3 generation, composed-event
   feasibility checks, a 300/60/60 train/dev/final-eval split, loop-regression
-  pricing, TFR-preserving outbound/recovery solver admission, scripted
-  calibration, deterministic sim logging, canonical hard-safety outcome
-  scoring, and the full SPEC §3.2 console. Live frontier calibration and
-  renderer remain next.
+  pricing with structured ground-stall warnings, TFR-preserving
+  outbound/recovery solver admission, scripted calibration, deterministic sim
+  logging, canonical hard-safety outcome scoring, and the full SPEC §3.2
+  console. Live frontier calibration and renderer remain next.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.

@@ -270,6 +270,62 @@ def test_day3_console_tools_charge_time_and_return_structured_state() -> None:
     assert state["sim_state"]["sim_time_s"] == before_hold + uav_operator.TOOL_LATENCY_S + 60.0
 
 
+def test_ground_state_read_and_hold_loops_warn_and_escalate_latency() -> None:
+    env, state = _setup_state(seed=18, scenario_index=0, tier="T0")
+
+    for _ in range(uav_operator.GROUND_STALL_WARNING_THRESHOLD):
+        response = _run_tool(env, state, "get_telemetry", {})
+        assert "operator_warning" not in json.loads(response[0].content)
+
+    before_warning = state["sim_state"]["sim_time_s"]
+    response = _run_tool(env, state, "get_telemetry", {})
+    warning = json.loads(response[0].content)["operator_warning"]
+    assert warning == {
+        "additional_latency_s": uav_operator.GROUND_STALL_LATENCY_STEP_S,
+        "code": "ground_no_progress_loop",
+        "message": (
+            "The aircraft remains on the ground and the mission has not advanced. "
+            "Choose an operational action, continue waiting only for a specific timed condition, "
+            "or abort the mission."
+        ),
+        "streak": 4,
+    }
+    assert state["sim_state"]["sim_time_s"] == (
+        before_warning
+        + uav_operator.GROUND_STALL_LATENCY_STEP_S
+        + uav_operator.READ_TOOL_LATENCY_S
+    )
+
+    before_hold = state["sim_state"]["sim_time_s"]
+    hold = _run_tool(env, state, "hold", {"minutes": 1})
+    hold_warning = json.loads(hold[0].content)["operator_warning"]
+    assert hold_warning["streak"] == 5
+    assert hold_warning["additional_latency_s"] == 2 * uav_operator.GROUND_STALL_LATENCY_STEP_S
+    assert state["sim_state"]["sim_time_s"] == (
+        before_hold
+        + 2 * uav_operator.GROUND_STALL_LATENCY_STEP_S
+        + uav_operator.TOOL_LATENCY_S
+        + 60.0
+    )
+
+    _run_tool(env, state, "set_speed", {"kt": 32})
+    assert state["sim_state"]["ground_no_progress_streak"] == 5
+
+    target = state["sim_state"]["mission"]["target"]
+    _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [target],
+            "alt_ft": 300,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+    assert state["sim_state"]["ground_no_progress_streak"] == 0
+
+
 def test_day3_override_and_acknowledge_clear_active_geofence_failsafe() -> None:
     env, state = _setup_state(seed=14, scenario_index=3)
 

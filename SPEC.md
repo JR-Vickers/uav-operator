@@ -112,7 +112,9 @@ Act: `file_flight_plan(waypoints, alt_ft, airspeed_kt, lost_link_plan)`,
 - Plans are validated on filing: airspace conflicts and infeasible segments
   are returned as structured warnings (operator may file anyway — knowingly
   filing through a TFR is on them, and on the reward).
-- Every tool call costs 10–30s sim time (decision latency is real).
+- Every ordinary tool call costs 10–30s sim time (decision latency is real).
+  Repeated ground-state observation/hold calls without mission progress receive
+  a structured warning and escalating additional decision latency.
 
 ### 3.3 Messages to the model
 - System prompt: role (remote PIC), ops manual summary (failsafe rulebook,

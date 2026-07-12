@@ -79,3 +79,20 @@ Current defense:
   distinct only when the aircraft was not also lost.
 - A regression recreates the saved T2 rollout's overlapping labels and
   verifies that the single physical outcome costs exactly `-5.0`.
+
+## Day 5: ground-state observation and hold loops
+
+Exploit / failure mode:
+- A model can remain on the ground while repeatedly querying telemetry and
+  related read tools, or issuing holds without a specific timed condition.
+  The old 10–20 second console cost allowed long, low-information rollouts
+  before the turn cap ended the episode.
+
+Current defense:
+- After three consecutive ground-state read/hold actions with a pending
+  mission, the console returns a structured `ground_no_progress_loop` warning.
+- Each further call receives deterministic, escalating simulated decision
+  latency, capped at two minutes per call. A meaningful operational action
+  resets the streak; the simulator never selects an action for the model.
+- A regression covers telemetry repetition, a subsequent hold, exact latency
+  pricing, and streak reset.
