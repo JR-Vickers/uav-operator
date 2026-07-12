@@ -3,17 +3,17 @@
   "series": {
     "openai/gpt-4.1-nano": {
       "T0": {
-        "ci95_high": 0.9647295183658452,
-        "ci95_low": 0.8334869174821405,
+        "ci95_high": 0.9124013502457833,
+        "ci95_low": 0.8324181453149273,
         "hard_safety_violations": 0,
-        "max_turn_outcomes": 0,
-        "mean_reward": 0.8991082179239929,
-        "mean_turns": 4.8,
-        "missions_completed": 10,
-        "n": 10,
+        "max_turn_outcomes": 1,
+        "mean_reward": 0.8724097477803553,
+        "mean_turns": 6.633333333333334,
+        "missions_completed": 30,
+        "n": 30,
         "provider_errors": 0,
-        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/f32c2f03",
-        "run_id": "f32c2f03"
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/6d18e4bc",
+        "run_id": "6d18e4bc"
       },
       "T1": {
         "ci95_high": 0.2884265140673856,
@@ -53,6 +53,60 @@
         "provider_errors": 0,
         "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/ef609452",
         "run_id": "ef609452"
+      }
+    },
+    "poolside/laguna-m.1": {
+      "T0": {
+        "ci95_high": 1.000037834496161,
+        "ci95_low": 0.9993474038711008,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 0,
+        "mean_reward": 0.9996926191836308,
+        "mean_turns": 6.866666666666666,
+        "missions_completed": 30,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/bb684c4c",
+        "run_id": "bb684c4c"
+      },
+      "T1": {
+        "ci95_high": 0.746712105031373,
+        "ci95_low": -0.18300266716960684,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 8,
+        "mean_reward": 0.28185471893088304,
+        "mean_turns": 19.7,
+        "missions_completed": 22,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/1c757714",
+        "run_id": "1c757714"
+      },
+      "T2": {
+        "ci95_high": 0.8113343413705568,
+        "ci95_low": 0.14591991730684295,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 2,
+        "mean_reward": 0.4786271293386999,
+        "mean_turns": 17.266666666666666,
+        "missions_completed": 28,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/99ecf01b",
+        "run_id": "99ecf01b"
+      },
+      "T3": {
+        "ci95_high": 0.6731862903783365,
+        "ci95_low": 0.335283594904914,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 3,
+        "mean_reward": 0.5042349426416253,
+        "mean_turns": 21.433333333333334,
+        "missions_completed": 27,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/t3-clean-retry",
+        "run_id": "t3-clean-retry"
       }
     }
   },

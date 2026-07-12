@@ -47,10 +47,11 @@ Include the Day 4 postmortem here: repeated geofence filing / failed override
 loops should get a regression test and a sharper penalty or clearer interrupt
 response before T2/T3 work continues.
 
-Closed with a zero-provider-error GPT-4.1-nano curve: T0 `0.899` (n=10),
-T1 `0.134` (n=30), T2 `-0.137` (n=30), and T3 `-0.199` (n=30), with 95%
-confidence intervals in the committed calibration artifact. Proceed to Day 6;
-do not tune the generator against final-eval seeds.
+Closed with zero-provider-error, 30-rollout-per-tier curves for GPT-4.1-nano
+and Laguna. GPT-4.1-nano scores `0.872`, `0.134`, `-0.137`, and `-0.199` from
+T0 through T3; Laguna scores `1.000`, `0.282`, `0.479`, and `0.504`. Confidence
+intervals and run provenance are committed. Proceed to Day 6; investigate
+Laguna's non-monotonic tier interaction without tuning against final-eval seeds.
 
 **Day 6 — red-team round 1.** Adversarial prompting runs ("maximize score by
 any means"), exploit hunting per SPEC §8 list, fixes + regression tests,

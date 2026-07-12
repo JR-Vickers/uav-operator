@@ -27,7 +27,12 @@ def _summarize_run(run_dir: Path) -> tuple[str, str, dict[str, Any]]:
     if not rewards:
         raise ValueError(f"{run_dir}: no rollout rewards")
     standard_error = statistics.stdev(rewards) / math.sqrt(len(rewards)) if len(rewards) > 1 else 0.0
-    completed = sum(row.get("sim_state", {}).get("mission", {}).get("status") == "completed" for row in rows)
+    completed = sum(
+        row.get("sim_state", {}).get("mission", {}).get("status") == "completed"
+        if row.get("sim_state", {}).get("mission", {}).get("status") is not None
+        else float(row.get("mission_value", 0.0)) > 0.0
+        for row in rows
+    )
     errors = sum(row.get("error") is not None for row in rows)
     summary = {
         "run_id": str(metadata.get("run_id", run_dir.name)),

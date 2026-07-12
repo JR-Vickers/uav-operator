@@ -96,26 +96,31 @@ Notes:
 
 ### Day 5 calibration
 
-![GPT-4.1-nano reward by curriculum tier](assets/evals/day5_tier_scores.png)
+![GPT-4.1-nano and Laguna reward by curriculum tier](assets/evals/day5_tier_scores.png)
 
-The primary calibration uses GPT-4.1-nano on the dev split with fixed
-sampling and no provider errors. Error bars are 95% normal confidence
-intervals over rollout rewards; `n` is annotated on every point.
+The calibration compares GPT-4.1-nano and Laguna on the same dev split with
+fixed sampling, 30 rollouts per tier, and no provider errors. Error bars are
+95% normal confidence intervals over rollout rewards; `n` is annotated on
+every point.
 
-| Tier | Mean reward | 95% CI | Missions completed | Run ID |
-| --- | ---: | ---: | ---: | --- |
-| T0 | 0.899 | [0.833, 0.965] | 10/10 | `f32c2f03` |
-| T1 | 0.134 | [-0.020, 0.288] | 7/30 | `f2cef9f9` |
-| T2 | -0.137 | [-0.154, -0.119] | 0/30 | `ea07497e` |
-| T3 | -0.199 | [-0.231, -0.167] | 0/30 | `ef609452` |
+| Model | Tier | Mean reward | 95% CI | Missions completed | Run ID |
+| --- | --- | ---: | ---: | ---: | --- |
+| GPT-4.1-nano | T0 | 0.872 | [0.832, 0.912] | 30/30 | `6d18e4bc` |
+| GPT-4.1-nano | T1 | 0.134 | [-0.020, 0.288] | 7/30 | `f2cef9f9` |
+| GPT-4.1-nano | T2 | -0.137 | [-0.154, -0.119] | 0/30 | `ea07497e` |
+| GPT-4.1-nano | T3 | -0.199 | [-0.231, -0.167] | 0/30 | `ef609452` |
+| Laguna | T0 | 1.000 | [0.999, 1.000] | 30/30 | `bb684c4c` |
+| Laguna | T1 | 0.282 | [-0.183, 0.747] | 22/30 | `1c757714` |
+| Laguna | T2 | 0.479 | [0.146, 0.811] | 28/30 | `99ecf01b` |
+| Laguna | T3 | 0.504 | [0.335, 0.673] | 27/30 | `t3-clean-retry` |
 
-This is the intended curriculum shape: T0 is near ceiling, T1 is materially
-harder, and T2/T3 fall below zero as composed interrupts and turn-cap failures
-increase. The T1-T3 runs are especially interpretable because all 90 rollouts
-had no provider errors or hard-safety violations. Laguna T2/T3 is not plotted:
-its T0/T1 coverage is incomplete and its saved runs include provider errors,
-so it is not a like-for-like calibration series. The machine-readable results
-and provenance are in
+GPT-4.1-nano shows the intended monotonic difficulty curve: T0 is near ceiling,
+T1 is materially harder, and T2/T3 fall below zero as composed interrupts and
+turn-cap failures increase. Laguna is near ceiling on T0 and substantially
+stronger on T2/T3, but its high-variance T1 result makes its curve non-monotonic.
+That model-specific interaction is calibration evidence to investigate rather
+than hide. All 240 plotted rollouts are free of provider errors and hard-safety
+violations. The machine-readable results and provenance are in
 [`assets/evals/day5_frontier_calibration.json`](assets/evals/day5_frontier_calibration.json).
 
 ### Taskset Config

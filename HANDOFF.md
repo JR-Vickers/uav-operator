@@ -1,5 +1,32 @@
 # HANDOFF.md
 
+## 2026-07-12 Day 5 final two-model curve
+
+Changed:
+- Replaced GPT-4.1-nano's 10-rollout T0 point with clean 30-rollout run
+  `6d18e4bc` and added a complete 30-rollout-per-tier Laguna series.
+- Recovered Laguna T3 infrastructure failures by retaining the 28 valid rows
+  from `fc2fab5c` and resuming only the two missing rollouts until the merged
+  `t3-clean-retry` artifact contained 30 valid rows and zero provider errors.
+- Updated the plot, machine-readable summary, README table, and interpretation.
+  All 240 plotted rollouts have zero provider errors and zero hard-safety
+  violations.
+
+Interpretation:
+- GPT-4.1-nano remains the clean monotonic calibration curve: `0.872`, `0.134`,
+  `-0.137`, `-0.199` from T0 through T3.
+- Laguna scores `1.000`, `0.282`, `0.479`, `0.504`. Its T1 variance and
+  non-monotonic curve warrant investigation during Day 6 rather than being
+  presented as a universal tier ordering.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 21 tests.
+- `git diff --check` passes.
+
+Next action:
+- Begin Day 6 red-team round 1 and freeze the rollout-JSON schema.
+
 ## 2026-07-12 Day 5 complete: frontier calibration curve
 
 Changed:
