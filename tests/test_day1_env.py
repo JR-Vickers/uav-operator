@@ -546,3 +546,161 @@ def test_day4_rulebook_baseline_beats_reckless_baseline() -> None:
     reckless_avg = sum(row["reward"] for row in reckless_rows) / len(reckless_rows)
 
     assert rulebook_avg > reckless_avg
+
+
+def test_day6_mid_flight_event_interrupt_pauses_route() -> None:
+    env, state = _setup_state(seed=500, scenario_index=0, tier="T3")
+    target = state["sim_state"]["mission"]["target"]
+    plan = {
+        "waypoints": [target],
+        "alt_ft": 300,
+        "airspeed_kt": 35,
+        "lost_link_plan": "return_home",
+    }
+
+    first = json.loads(_run_tool(env, state, "file_flight_plan", plan)[0].content)
+    assert first["error"] == "event_interrupt"
+    for alert in list(state["sim_state"]["alerts"]):
+        _run_tool(env, state, "acknowledge", {"alert_id": alert["alert_id"]})
+
+    second = json.loads(_run_tool(env, state, "file_flight_plan", plan)[0].content)
+
+    assert second["error"] == "event_interrupt"
+    assert second["remaining_route_suspended"] is True
+    segment = second["segments"][0]
+    assert segment["interrupted_by_event"] is True
+    assert 0.0 < segment["progress_fraction"] < 1.0
+    assert state["sim_state"]["aircraft"]["status"] == "holding"
+    assert state["sim_state"]["mission"]["status"] == "pending"
+    triggered = [
+        event
+        for event in state["sim_state"]["events"]
+        if event["status"] == "active" and event["trigger_time_s"] > 60.0
+    ]
+    assert triggered
+    assert state["sim_state"]["sim_time_s"] == triggered[0]["trigger_time_s"]
+
+
+def test_day6_airborne_hold_burns_hover_energy_and_triggers_low_batt_rtl() -> None:
+    env, state = _setup_state(seed=102, scenario_index=0, tier="T0")
+    launch = state["sim_state"]["aircraft"]
+    target = state["sim_state"]["mission"]["target"]
+    midpoint = {
+        "lat": (launch["lat"] + target["lat"]) / 2.0,
+        "lon": (launch["lon"] + target["lon"]) / 2.0,
+        "name": "loiter point",
+    }
+    _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [midpoint],
+            "alt_ft": 300,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+    assert state["sim_state"]["aircraft"]["status"] == "holding"
+
+    battery_before = state["sim_state"]["aircraft"]["battery_wh"]
+    hold = json.loads(_run_tool(env, state, "hold", {"minutes": 30})[0].content)
+    drain_wh = battery_before - state["sim_state"]["aircraft"]["battery_wh"]
+    expected_wh = uav_operator.HOVER_POWER_W * (uav_operator.TOOL_LATENCY_S + 1800.0) / 3600.0
+    assert abs(drain_wh - expected_wh) < 1e-6
+    assert hold["interrupted_by_event"] is False
+
+    for _ in range(4):
+        if state["sim_state"]["is_terminal"]:
+            break
+        hold = json.loads(_run_tool(env, state, "hold", {"minutes": 30})[0].content)
+
+    assert state["sim_state"]["active_failsafe"] == "LOW_BATT_RTL"
+    assert "failsafe" in hold
+    assert state["sim_state"]["aircraft"]["status"] == "landed"
+    assert state["sim_state"]["is_terminal"] is True
+    assert state["sim_state"]["mission"]["status"] == "failed"
+
+
+def test_day6_no_fly_buffer_blocks_boundary_hugging() -> None:
+    env, state = _setup_state(seed=103, scenario_index=2, tier="T0")
+    hug_lat = 37.7570 + 0.0005
+
+    response = _run_tool(
+        env,
+        state,
+        "file_flight_plan",
+        {
+            "waypoints": [
+                {"lat": hug_lat, "lon": -122.2075, "name": "hug west"},
+                {"lat": hug_lat, "lon": -122.1930, "name": "hug east"},
+            ],
+            "alt_ft": 250,
+            "airspeed_kt": 35,
+            "lost_link_plan": "return_home",
+        },
+    )
+
+    result = json.loads(response[0].content)
+    assert result["error"] == "failsafe:GEOFENCE_HOLD"
+    assert any(
+        zone["zone_id"] == "oakland_coliseum_no_fly" for zone in result["conflicts"]
+    )
+    assert "filed_known_conflict:oakland_coliseum_no_fly" in state["sim_state"]["procedure_violations"]
+    clear_offset = uav_operator.AIRSPACE_BUFFER_NM / 60.0 + 0.001
+    clear = json.loads(
+        _run_tool(
+            env,
+            state,
+            "get_airspace",
+            {
+                "route": [
+                    {"lat": 37.7570 + clear_offset, "lon": -122.2075, "name": "clear west"},
+                    {"lat": 37.7570 + clear_offset, "lon": -122.1930, "name": "clear east"},
+                ],
+                "alt_ft": 250,
+            },
+        )[0].content
+    )
+    assert all(
+        zone["zone_id"] != "oakland_coliseum_no_fly" for zone in clear["route_conflicts"]
+    )
+
+
+def test_day6_abort_on_ground_terminates_without_false_crit_batt() -> None:
+    env, state = _setup_state(seed=105, scenario_index=0, tier="T0")
+    state["sim_state"]["aircraft"]["battery_wh"] = uav_operator.BATTERY_WH * 0.10
+
+    _run_tool(
+        env,
+        state,
+        "abort_mission",
+        {"mission_id": state["sim_state"]["mission"]["mission_id"]},
+    )
+
+    assert state["sim_state"]["is_terminal"] is True
+    assert state["sim_state"]["terminal_reason"] == "aircraft_ground_mission_failed"
+    assert uav_operator.hard_safety(state) == 0.0
+
+
+def test_day6_geofence_hold_flags_target_inside_active_tfr() -> None:
+    env, state = _setup_state(seed=31, scenario_index=1, tier="T1")
+    target = state["sim_state"]["mission"]["target"]
+    plan = {
+        "waypoints": [target],
+        "alt_ft": 300,
+        "airspeed_kt": 35,
+        "lost_link_plan": "return_home",
+    }
+
+    first = json.loads(_run_tool(env, state, "file_flight_plan", plan)[0].content)
+    assert first["error"] == "event_interrupt"
+    for alert in list(state["sim_state"]["alerts"]):
+        _run_tool(env, state, "acknowledge", {"alert_id": alert["alert_id"]})
+
+    second = json.loads(_run_tool(env, state, "file_flight_plan", plan)[0].content)
+
+    assert second["error"] == "failsafe:GEOFENCE_HOLD"
+    assert second["mission_target_inside_zone"] is True
+    assert "advisory" in second
+    assert any(zone["contains_mission_target"] for zone in second["conflicts"])
