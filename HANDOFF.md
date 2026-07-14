@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-## 2026-07-14 Day 7 soft-launch release candidate awaiting approval
+## 2026-07-14 Day 7 complete: renderer and public soft launch
 
 Changed:
 - Added the deterministic `scripts/render.py` pipeline for frozen v1
@@ -15,6 +15,11 @@ Changed:
   contact sheet are under `assets/renders/day7/`.
 - Set the release candidate to `0.1.1`. The earlier `0.1.0` Hub push consumed
   the version originally scheduled for the later environment freeze.
+- Tightened each clip to its mission-derived extent after the cold-viewer
+  review, placing home and target near opposite map edges. Mission-bounded
+  zoom-12 rasters keep the close-up sharp while remaining locally cached.
+- Published public `jarrett/uav-operator@0.1.1`; Hub wheel SHA-256 is
+  `8d67634eb9d0c39e63b5a8b9c7b3267db448ff598d448a6ce05c56df4bfa9f34`.
 
 Verified:
 - Ruff and all 37 tests pass; `git diff --check` passes.
@@ -23,14 +28,28 @@ Verified:
   with no audio stream. The hero GIF is 960x540 and about 0.5 MB.
 - The hero truthfully shows a TFR activating while the aircraft remains on the
   ground during mission intake. A true mid-flight TFR is deferred.
+- The exact Hub wheel installed into
+  `/tmp/uav-operator-hub-0.1.1-8djuQb/.venv`; its imported module resolved from
+  isolated site-packages and `load_environment(max_examples=1)` returned
+  `UAVOperatorEnv`.
+- Isolated saved-state eval `407bb371` ran two one-rollout examples with
+  `openai/gpt-4.1-nano`: zero provider errors, rewards `0.8` and `0.0`, and
+  complete `sim_log` arrays of 5 and 40 snapshots. Results path:
+  `/tmp/uav-operator-hub-0.1.1-8djuQb/eval-openai/evals/uav-operator--openai--gpt-4.1-nano/407bb371`.
+- Extracted row 0 from those results and rendered it from outside the repo via
+  the public renderer command in `--no-basemap` mode; FFprobe confirmed a
+  22-second 1920x1080 H.264/yuv420p artifact.
 
-Not done / gate still open:
-- A human five-second visual verdict is required before public publication.
-- After approval: push `jarrett/uav-operator@0.1.1` PUBLIC, verify Hub info,
-  install from an isolated directory, and run a saved-state two-example,
-  one-rollout `gpt-4.1-nano` eval with zero provider errors.
-- Do not mark Day 7 complete until the isolated Hub eval passes and its
-  `run_id` / `results_path` are recorded here.
+Install/eval notes and deferred work:
+- `prime env install jarrett/uav-operator@0.1.1` fails dependency resolution
+  unless `--prerelease` is supplied. README now includes the required flag;
+  direct isolated verification used `uv pip install --prerelease allow` with
+  the owner's Hub index.
+- Failed preflight eval `a82a4099` used bare `gpt-4.1-nano` against the Prime
+  provider and received `model_not_found`; the proven registered identifier is
+  `openai/gpt-4.1-nano`, used successfully in `407bb371`.
+- A true mid-flight TFR clip and same-seed before/after-training pair remain
+  deferred until suitable saved evidence exists.
 
 ## 2026-07-14 fixed-sim frontier recalibration complete
 

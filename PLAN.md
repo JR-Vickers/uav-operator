@@ -69,7 +69,7 @@ the Day 10 fleet-gate prerequisite. The fixed-sim tier curve now has 30 clean
 rollouts per model/tier: Laguna drops from `0.476` on T2 to `0.095` on T3,
 providing the intended composed-event separation for Day 7.
 
-**Day 7 — renderer + soft-launch. GATE.** Matplotlib/contextily pipeline to
+**Day 7 — renderer + soft-launch. COMPLETE.** Matplotlib/contextily pipeline to
 mp4; render 5 best episodes from baselines; `prime env push` as v0.0.x
 (public but unannounced); README skeleton with quickstart + one GIF.
 GATE CRITERIA: a stranger could install from Hub and reproduce an eval; one
@@ -79,6 +79,14 @@ of animation; do NOT let animation polish eat Phase 3.
 All gated evals should print the saved `run_id` and `results_path` in the
 terminal summary so cropped output is still traceable without opening the
 artifact directory.
+
+Closed with public `jarrett/uav-operator@0.1.1`, five frozen Laguna T3 clips,
+a 960px hero GIF, contact sheet, cached mission-scale Contextily maps, and the
+offline `--no-basemap` fallback. The approved viewport puts mission endpoints
+near opposite map edges. An isolated exact-version install exposed and
+documented the required prerelease dependency flag; saved-state eval
+`407bb371` ran `openai/gpt-4.1-nano` for two examples with zero provider errors,
+and its saved `sim_log` rendered successfully from outside the repository.
 
 **Day 8 — training prep.** prime-rl configs (orchestrator/trainer/inference
 TOMLs) for Qwen3-4B-Instruct LoRA GRPO on a small PI pod; smoke run (50

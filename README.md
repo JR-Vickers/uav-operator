@@ -19,10 +19,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 7 soft-launch release candidate. The offline renderer, five
-  fixed Laguna T3 clips, hero GIF, frozen rollout artifacts, and `0.1.1`
-  package candidate are complete. Public Hub publication remains gated on the
-  cold-viewer visual check and an isolated install/eval.
+- **Status**: Day 7 soft launch complete. Public Hub release
+  `jarrett/uav-operator@0.1.1`, five fixed Laguna T3 clips, hero GIF, frozen
+  rollout artifacts, and the offline renderer are verified. Isolated Hub eval
+  `407bb371` completed two `openai/gpt-4.1-nano` rollouts with zero provider
+  errors and renderable saved state.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -48,9 +49,13 @@ the model's prose.
 Install the public Hub release and run a two-example smoke evaluation:
 
 ```bash
-prime --plain env install jarrett/uav-operator@0.1.1
+prime --plain env install jarrett/uav-operator@0.1.1 --prerelease
 prime --plain eval run uav-operator -n 2 -r 1 --disable-tui
 ```
+
+`--prerelease` is currently required because the environment's minimum
+Verifiers version is a development release; without the flag, dependency
+resolution rejects otherwise compatible Verifiers and Renderers packages.
 
 For source development, clone the repository and create the complete runtime
 and development environment from the lockfile:
