@@ -102,42 +102,41 @@ Notes:
   Individual rollouts still have a 420-second timeout so one hung provider
   request cannot block the persistent retry loop.
 
-### Day 5 calibration
+### Day 6 post-fix calibration
 
-![GPT-4.1-nano and Laguna reward by curriculum tier](assets/evals/day5_tier_scores.png)
+![GPT-4.1-nano and Laguna reward by curriculum tier](assets/evals/day6_tier_scores.png)
 
 The calibration compares GPT-4.1-nano and Laguna on the same dev split with
 fixed sampling, 30 rollouts per tier, and no provider errors. Error bars are
 95% normal confidence intervals over rollout rewards; `n` is annotated on
 every point.
 
-| Model | Tier | Mean reward | 95% CI | Missions completed | Run ID |
-| --- | --- | ---: | ---: | ---: | --- |
-| GPT-4.1-nano | T0 | 0.872 | [0.832, 0.912] | 30/30 | `6d18e4bc` |
-| GPT-4.1-nano | T1 | 0.134 | [-0.020, 0.288] | 7/30 | `f2cef9f9` |
-| GPT-4.1-nano | T2 | -0.137 | [-0.154, -0.119] | 0/30 | `ea07497e` |
-| GPT-4.1-nano | T3 | -0.199 | [-0.231, -0.167] | 0/30 | `ef609452` |
-| Laguna | T0 | 1.000 | [0.999, 1.000] | 30/30 | `bb684c4c` |
-| Laguna | T1 | 0.282 | [-0.183, 0.747] | 22/30 | `1c757714` |
-| Laguna | T2 | 0.479 | [0.146, 0.811] | 28/30 | `99ecf01b` |
-| Laguna | T3 | 0.504 | [0.335, 0.673] | 27/30 | `t3-clean-retry` |
+| Model | Tier | Mean reward | 95% CI | Missions completed | Hard safety | Run ID |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| GPT-4.1-nano | T0 | 0.884 | [0.847, 0.921] | 30/30 | 0 | `cdbac883` |
+| GPT-4.1-nano | T1 | -0.055 | [-0.451, 0.341] | 6/30 | 1 | `d43ac56f` |
+| GPT-4.1-nano | T2 | -0.140 | [-0.158, -0.122] | 0/30 | 0 | `99c64cc4` |
+| GPT-4.1-nano | T3 | -0.196 | [-0.229, -0.162] | 0/30 | 0 | `bde540dd` |
+| Laguna | T0 | 0.998 | [0.996, 1.000] | 30/30 | 0 | `day6-t0-clean-retry` |
+| Laguna | T1 | 0.424 | [0.098, 0.750] | 22/30 | 0 | `day6-t1-clean-retry` |
+| Laguna | T2 | 0.476 | [0.221, 0.731] | 29/30 | 0 | `day6-t2-clean-retry` |
+| Laguna | T3 | 0.095 | [-0.413, 0.603] | 26/30 | 2 | `day6-t3-clean-retry` |
 
-GPT-4.1-nano shows the intended monotonic difficulty curve: T0 is near ceiling,
-T1 is materially harder, and T2/T3 fall below zero as composed interrupts and
-turn-cap failures increase. Laguna is near ceiling on T0 and substantially
-stronger on T2/T3, but its high-variance T1 result makes its curve non-monotonic.
-All 240 plotted rollouts are free of provider errors and hard-safety
-violations. The machine-readable results and provenance are in
-[`assets/evals/day5_frontier_calibration.json`](assets/evals/day5_frontier_calibration.json).
+GPT-4.1-nano remains the weak monotonic reference: T0 is near ceiling, T1 is
+materially harder, and T2/T3 stay below zero. Laguna is near ceiling on T0 and
+strong through T2, then drops to `0.095` on T3 with two hard-safety outcomes.
+The fixed simulator therefore produces the intended frontier separation on
+the composed-event tier. All 240 plotted rollouts are free of provider errors;
+the machine-readable results and provenance are in
+[`assets/evals/day6_frontier_calibration.json`](assets/evals/day6_frontier_calibration.json).
 
 Day 6 resolved the Laguna T1 anomaly from the saved rollouts: the T1
 `TFR_POPUP` composition places the restriction over the mission target, and
 Laguna scored 0.93-1.0 on the other three T1 event families but -1.575 on the
 TFR scenarios, burning all 40 turns re-filing conflicting plans instead of
 aborting. Geofence holds now flag `mission_target_inside_zone` so that trap is
-legible. Note the Day 6 simulator changes (mid-segment event interrupts, hover
-energy, airspace buffer) supersede this curve; it will be regenerated before
-the Day 7 soft launch.
+legible. The curve above includes that fix plus Day 6 mid-segment interrupts,
+hover energy, and buffered airspace checks.
 
 ### Taskset Config
 Planned fields:

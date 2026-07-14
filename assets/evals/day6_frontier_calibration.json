@@ -1,0 +1,114 @@
+{
+  "interval": "95% normal confidence interval of rollout rewards",
+  "series": {
+    "openai/gpt-4.1-nano": {
+      "T0": {
+        "ci95_high": 0.920592229362084,
+        "ci95_low": 0.8466413940487253,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 0,
+        "mean_reward": 0.8836168117054046,
+        "mean_turns": 5.1,
+        "missions_completed": 30,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/cdbac883",
+        "run_id": "cdbac883"
+      },
+      "T1": {
+        "ci95_high": 0.34067322841190556,
+        "ci95_low": -0.4506915793085146,
+        "hard_safety_violations": 1,
+        "max_turn_outcomes": 5,
+        "mean_reward": -0.05500917544830453,
+        "mean_turns": 13.066666666666666,
+        "missions_completed": 6,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/d43ac56f",
+        "run_id": "d43ac56f"
+      },
+      "T2": {
+        "ci95_high": -0.1221695340150242,
+        "ci95_low": -0.15783046598497583,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 4,
+        "mean_reward": -0.14,
+        "mean_turns": 14.2,
+        "missions_completed": 0,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/99c64cc4",
+        "run_id": "99c64cc4"
+      },
+      "T3": {
+        "ci95_high": -0.16160986305386463,
+        "ci95_low": -0.2294854305807428,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 3,
+        "mean_reward": -0.19554764681730372,
+        "mean_turns": 12.866666666666667,
+        "missions_completed": 0,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--openai--gpt-4.1-nano/bde540dd",
+        "run_id": "bde540dd"
+      }
+    },
+    "poolside/laguna-m.1": {
+      "T0": {
+        "ci95_high": 0.999849963754656,
+        "ci95_low": 0.9964770919676808,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 0,
+        "mean_reward": 0.9981635278611684,
+        "mean_turns": 6.933333333333334,
+        "missions_completed": 30,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/day6-t0-clean-retry",
+        "run_id": "day6-t0-clean-retry"
+      },
+      "T1": {
+        "ci95_high": 0.7503453687736634,
+        "ci95_low": 0.09758923940249026,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 6,
+        "mean_reward": 0.42396730408807687,
+        "mean_turns": 19.0,
+        "missions_completed": 22,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/day6-t1-clean-retry",
+        "run_id": "day6-t1-clean-retry"
+      },
+      "T2": {
+        "ci95_high": 0.7306969598966916,
+        "ci95_low": 0.22149955060531246,
+        "hard_safety_violations": 0,
+        "max_turn_outcomes": 1,
+        "mean_reward": 0.476098255251002,
+        "mean_turns": 17.2,
+        "missions_completed": 29,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/day6-t2-clean-retry",
+        "run_id": "day6-t2-clean-retry"
+      },
+      "T3": {
+        "ci95_high": 0.6029237780897398,
+        "ci95_low": -0.4128537916948414,
+        "hard_safety_violations": 2,
+        "max_turn_outcomes": 3,
+        "mean_reward": 0.09503499319744924,
+        "mean_turns": 22.066666666666666,
+        "missions_completed": 26,
+        "n": 30,
+        "provider_errors": 0,
+        "results_path": "outputs/evals/uav-operator--poolside--laguna-m.1/day6-t3-clean-retry",
+        "run_id": "day6-t3-clean-retry"
+      }
+    }
+  },
+  "title": "uav-operator Day 6 post-fix frontier calibration"
+}

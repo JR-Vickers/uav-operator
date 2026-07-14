@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-## 2026-07-14 fixed-sim frontier recalibration recovery in progress
+## 2026-07-14 fixed-sim frontier recalibration complete
 
 Changed:
 - Added `scripts/run_frontier_calibration.py` to automate the former manual
@@ -16,18 +16,19 @@ Changed:
 - Documented the persistent runner in README. Raw Claude reruns remain intact;
   clean retry artifacts are under the ignored `outputs/evals/` tree.
 
-Current fixed-sim calibration state:
+Final fixed-sim calibration:
 - GPT-4.1-nano is clean at 30/30 for T0-T3: `cdbac883`, `d43ac56f`,
   `99c64cc4`, and `bde540dd`.
-- Laguna clean retry artifacts are T0 30/30, T1 30/30, T2 26/30, and T3
-  13/30. T0 converged in one pass and T1 in two. T2's remaining provider
-  failures return nonstandard `finish_reason="error"`; repeated bounded passes
-  advanced it from 14 to 26 clean rows.
+- Laguna clean retry artifacts reached 30/30 on every tier. T2 required 65
+  archived provider errors; T3 converged on retry attempt 14. The final scores
+  are `0.998`, `0.424`, `0.476`, and `0.095`, with the intended sharp T3 drop.
+- Generated `assets/evals/day6_tier_scores.png` and the machine-readable
+  `day6_frontier_calibration.json`; all 240 plotted rows have zero provider
+  errors. Laguna T3 includes two genuine hard-safety outcomes.
 
 Next action:
-- Resume T2/T3 with `scripts/run_frontier_calibration.py`, then regenerate the
-  Day 6 PNG/JSON, update the README calibration table and interpretation, and
-  commit those data artifacts as the final pre-Day-7 checkpoint.
+- Begin the Day 7 renderer against the frozen rollout schema, using fixed T3
+  Laguna rollouts as candidate failure/success clips.
 
 ## 2026-07-14 Day 6 complete: red-team round 1 + schema freeze
 
