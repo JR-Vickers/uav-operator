@@ -1,5 +1,34 @@
 # HANDOFF.md
 
+## 2026-07-14 fixed-sim frontier recalibration recovery in progress
+
+Changed:
+- Added `scripts/run_frontier_calibration.py` to automate the former manual
+  clean-retry process. It preserves successful rows by `example_id`, archives
+  provider-error rows in `failed_results.jsonl`, removes only those errors from
+  the resumable artifact, and retries missing per-example slots until all 15
+  dev examples have two clean rollouts each.
+- Unlimited attempts are the intentional default (`--max-attempts 0`), while
+  each rollout has a 420-second timeout and retry batches use concurrency 8 so
+  a hung provider request cannot block the loop indefinitely.
+- Added regressions for error archival, per-example quotas, valid truncated
+  outcomes, and plot rejection of any run that still contains provider errors.
+- Documented the persistent runner in README. Raw Claude reruns remain intact;
+  clean retry artifacts are under the ignored `outputs/evals/` tree.
+
+Current fixed-sim calibration state:
+- GPT-4.1-nano is clean at 30/30 for T0-T3: `cdbac883`, `d43ac56f`,
+  `99c64cc4`, and `bde540dd`.
+- Laguna clean retry artifacts are T0 30/30, T1 30/30, T2 26/30, and T3
+  13/30. T0 converged in one pass and T1 in two. T2's remaining provider
+  failures return nonstandard `finish_reason="error"`; repeated bounded passes
+  advanced it from 14 to 26 clean rows.
+
+Next action:
+- Resume T2/T3 with `scripts/run_frontier_calibration.py`, then regenerate the
+  Day 6 PNG/JSON, update the README calibration table and interpretation, and
+  commit those data artifacts as the final pre-Day-7 checkpoint.
+
 ## 2026-07-14 Day 6 complete: red-team round 1 + schema freeze
 
 Changed:

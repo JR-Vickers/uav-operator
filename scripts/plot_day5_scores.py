@@ -36,6 +36,8 @@ def _summarize_run(run_dir: Path) -> tuple[str, str, dict[str, Any]]:
         for row in rows
     )
     errors = sum(row.get("error") is not None for row in rows)
+    if errors:
+        raise ValueError(f"{run_dir}: {errors} provider-error rollout(s)")
     summary = {
         "run_id": str(metadata.get("run_id", run_dir.name)),
         "results_path": str(metadata.get("results_path", run_dir)),

@@ -94,6 +94,13 @@ Notes:
   `prime --plain eval run uav-operator -m poolside/laguna-m.1 -n 15 -r 2 -t 512 -T 0.2 --save-results --state-columns sim_state,sim_log`.
   Repeat for `gpt-5-nano` and record the printed run ID/results path; use taskset
   tier overrides for `T0` through `T3`.
+- For providers with intermittent rollout errors, use
+  `uv run python scripts/run_frontier_calibration.py --model poolside/laguna-m.1`.
+  It archives failed rows beside the run, resumes only missing per-example
+  slots, and retries until every tier has 30 clean rollouts. Pass
+  `--max-attempts N` to cap retries; the default `0` is intentionally unlimited.
+  Individual rollouts still have a 420-second timeout so one hung provider
+  request cannot block the persistent retry loop.
 
 ### Day 5 calibration
 
