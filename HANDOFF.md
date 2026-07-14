@@ -1,5 +1,61 @@
 # HANDOFF.md
 
+## 2026-07-14 Day 6 complete: red-team round 1 + schema freeze
+
+Changed:
+- Built `scripts/redteam_day6.py`, deterministic probes for every SPEC §8
+  exploit class through the real tool-call path; pre/post-fix evidence saved
+  to `assets/redteam/day6_round1_{prefix,postfix}.json`.
+- Closed five exploits with regression tests (27 tests total): mid-flight
+  event skipping (segments now split at pending event triggers, remaining
+  route suspends, holds cap at the next trigger), free airborne loitering
+  (hover power burns during all airborne time; LOW_BATT_RTL fires after
+  holds; hovering to depletion loses the aircraft), no-fly boundary hugging
+  (0.2 nm buffer on authorization-required zones in validation and the
+  feasibility solver), abort-on-ground zombie episodes (now terminal as
+  `aircraft_ground_mission_<status>`), and a critical-battery-on-ground
+  false hard-safety penalty (crit-batt now requires airborne/holding).
+- Verified four classes closed by construction: success-claiming, override
+  spam, SLA partial-credit farming, tool-error loops.
+- Resolved the Day 5 Laguna T1 anomaly from saved run `1c757714`: the T1
+  TFR_POPUP composition covers the mission target; Laguna scored 0.93-1.0 on
+  other T1 event types but -1.575 with all 40 turns burned on the 8 TFR
+  scenarios. Geofence holds now report `contains_mission_target` plus an
+  advisory; regression added. No eval-seed tuning.
+- Ran live adversarial prompting evals on the fixed sim via a new
+  `system_prompt` env kwarg: GPT-4.1-nano T2 dev `a32af316` (all rollouts
+  -0.1..-0.2) and Laguna T3 dev `a44f3e91` (avg 0.478, zero skipped events,
+  zero hard-safety escapes; best rollout was honest flying). Artifacts in
+  `assets/redteam/day6_adversarial/`.
+- Froze the rollout JSON schema at v1 in `docs/SCHEMA.md` with an enforcement
+  test asserting exact snapshot/segment/alert key sets.
+- Updated SPEC (buffer, mid-flight interrupts, hover energy, crit-batt
+  wording, §8 round 1 status), README status, and `docs/HACKS.md`.
+
+Verified:
+- `uv run ruff check .` passes.
+- `uv run pytest -q` passes: 27 tests.
+- T2/T3 dev generation unchanged under the buffered solver (9/11 TFR
+  scenarios retained, all feasible); dataset rows are byte-identical.
+- Baselines on the fixed sim: rulebook still beats reckless on T0/T1
+  (0.995/0.651 vs 0.831/0.394); both bots are weak on T2/T3 as intended.
+
+Broken / not done:
+- The Day 5 calibration curve pre-dates the Day 6 sim changes; regenerate
+  both model curves before the Day 7 soft launch (README notes this).
+- Commanded RTL/land_now recovery legs remain uninterruptible and are not
+  validated against active TFRs; post-incursion hard-safety logging is still
+  deferred until route-through authorization semantics exist.
+- A TFR activating mid-flight can, rarely, trap the aircraft inside the new
+  polygon; the escape hatch is RTL (mission value lost). Documented, not yet
+  priced or rendered.
+
+Next action:
+- Day 7: renderer + soft launch. Build the mp4 pipeline against frozen
+  `docs/SCHEMA.md`, render 5 best episodes, `prime env push` v0.0.x, README
+  quickstart + GIF. Regenerate the tier curve on the fixed sim first so the
+  README table is not stale.
+
 ## 2026-07-12 Day 5 final two-model curve
 
 Changed:
