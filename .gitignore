@@ -6,6 +6,7 @@ __pycache__/
 # Test/tool caches
 .pytest_cache/
 .ruff_cache/
+.cache/
 
 # Local virtualenvs
 .venv/
