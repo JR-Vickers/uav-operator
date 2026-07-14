@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -23,7 +24,7 @@ from matplotlib.patches import Polygon, Rectangle
 
 ROOT = Path(__file__).resolve().parents[1]
 WORLD_PATH = ROOT / "data" / "world.json"
-DEFAULT_CACHE = ROOT / ".cache" / "uav-renderer" / "bay-area-dark-z11.tif"
+DEFAULT_CACHE = ROOT / ".cache" / "uav-renderer" / "mission-dark.tif"
 
 BG = "#071019"
 PANEL = "#0d1924"
@@ -367,8 +368,8 @@ def _map_extent(log: Sequence[Mapping[str, Any]]) -> tuple[float, float, float, 
             for lat, lon in event.get("params", {}).get("polygon", []):
                 points.append((float(lon), float(lat)))
     lons, lats = zip(*points, strict=True)
-    lon_pad = max(0.018, (max(lons) - min(lons)) * 0.18)
-    lat_pad = max(0.015, (max(lats) - min(lats)) * 0.18)
+    lon_pad = max(0.007, (max(lons) - min(lons)) * 0.12)
+    lat_pad = max(0.006, (max(lats) - min(lats)) * 0.12)
     return min(lons) - lon_pad, max(lons) + lon_pad, min(lats) - lat_pad, max(lats) + lat_pad
 
 
@@ -381,20 +382,20 @@ def _add_basemap(ax: Axes, extent: tuple[float, float, float, float], cache: Pat
             "Contextily is required for basemaps; run with --no-basemap or install dev dependencies",
         ) from exc
     cache.parent.mkdir(parents=True, exist_ok=True)
-    if not cache.exists():
-        world_bbox = load_world()["bbox"]
-        west = float(world_bbox["min_lon"])
-        east = float(world_bbox["max_lon"])
-        south = float(world_bbox["min_lat"])
-        north = float(world_bbox["max_lat"])
+    cache_key = hashlib.sha1(
+        ",".join(f"{coordinate:.5f}" for coordinate in extent).encode()
+    ).hexdigest()[:12]
+    raster_cache = cache.with_name(f"{cache.stem}-{cache_key}{cache.suffix}")
+    if not raster_cache.exists():
+        west, east, south, north = extent
         try:
             cx.bounds2raster(
                 west,
                 south,
                 east,
                 north,
-                str(cache),
-                zoom=11,
+                str(raster_cache),
+                zoom=12,
                 source=cx.providers.CartoDB.DarkMatterNoLabels,
                 ll=True,
                 use_cache=True,
@@ -406,7 +407,7 @@ def _add_basemap(ax: Axes, extent: tuple[float, float, float, float], cache: Pat
             ) from exc
     cx.add_basemap(
         ax,
-        source=str(cache),
+        source=str(raster_cache),
         crs="EPSG:4326",
         attribution="© OpenStreetMap contributors © CARTO",
         attribution_size=5,
@@ -435,6 +436,11 @@ def _draw_static_map(
     ax.set_aspect(1.0 / max(0.1, math.cos(math.radians(sum(extent[2:]) / 2.0))))
     if not no_basemap:
         _add_basemap(ax, extent, basemap_cache)
+        # A reusable full-Bay raster must not dictate the mission viewport.
+        # Contextily expands axes to its source bounds, so restore the tight
+        # rollout-derived extent after drawing it.
+        ax.set_xlim(extent[0], extent[1])
+        ax.set_ylim(extent[2], extent[3])
     else:
         ax.grid(color=GRID, alpha=0.35, linewidth=0.5)
         ax.text(
