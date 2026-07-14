@@ -1,5 +1,37 @@
 # HANDOFF.md
 
+## 2026-07-14 Day 7 soft-launch release candidate awaiting approval
+
+Changed:
+- Added the deterministic `scripts/render.py` pipeline for frozen v1
+  `sim_log` artifacts: 1920x1080/30 fps H.264 MP4, 960px/12 fps GIF, cached
+  attributed Contextily basemap, and a network-independent `--no-basemap`
+  mode. Contextily remains dev-only; runtime dependencies are unchanged.
+- Added schema, trajectory, event/TFR, wind, battery, terminal-state, and
+  low-resolution FFmpeg integration coverage.
+- Curated the fixed zero-based Laguna T3 rows 23, 28, 4, 12, and 20 from
+  `day6-t3-clean-retry/results.jsonl`. Complete provenance and `sim_log` are
+  under `assets/rollouts/day7/`; five MP4s, the row-23 hero GIF, and the
+  contact sheet are under `assets/renders/day7/`.
+- Set the release candidate to `0.1.1`. The earlier `0.1.0` Hub push consumed
+  the version originally scheduled for the later environment freeze.
+
+Verified:
+- Ruff and all 37 tests pass; `git diff --check` passes.
+- All five artifacts render with the cached full-Bay basemap and independently
+  with `--no-basemap`; MP4s are 22-second, 1920x1080, 30 fps H.264/yuv420p
+  with no audio stream. The hero GIF is 960x540 and about 0.5 MB.
+- The hero truthfully shows a TFR activating while the aircraft remains on the
+  ground during mission intake. A true mid-flight TFR is deferred.
+
+Not done / gate still open:
+- A human five-second visual verdict is required before public publication.
+- After approval: push `jarrett/uav-operator@0.1.1` PUBLIC, verify Hub info,
+  install from an isolated directory, and run a saved-state two-example,
+  one-rollout `gpt-4.1-nano` eval with zero provider errors.
+- Do not mark Day 7 complete until the isolated Hub eval passes and its
+  `run_id` / `results_path` are recorded here.
+
 ## 2026-07-14 fixed-sim frontier recalibration complete
 
 Changed:

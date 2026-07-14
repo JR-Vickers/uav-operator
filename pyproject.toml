@@ -2,7 +2,7 @@
 name = "uav-operator"
 description = "A multi-turn UAV operations environment where models manage drone missions under wind, airspace, and failure events."
 tags = ["uav", "drone-operations", "multi-turn", "tool-use", "train", "eval"]
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.10"
 dependencies = [
     "numpy",

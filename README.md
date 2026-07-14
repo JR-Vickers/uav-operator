@@ -11,20 +11,18 @@ battery anomalies, lost-link events, and mission updates. The simulator owns
 the aircraft and every reward is computed from logged simulator state, not from
 the model's prose.
 
+![UAV ops console: Laguna handles four composed events and lands safely](assets/renders/day7/hero-treasure-island-safe-response.gif)
+
 ### Overview
 - **Environment ID**: `uav-operator`
 - **Short description**: Multi-turn UAV operations environment with
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 6 red-team round 1 complete: scripted probes covered every
-  SPEC §8 exploit class; five exploits closed with regression tests
-  (mid-flight event skipping, free airborne loitering, no-fly boundary
-  hugging, abort-on-ground zombie episodes, and a ground critical-battery
-  false penalty) and four verified closed by construction. Events now
-  interrupt flight mid-segment, airborne time burns hover power, and
-  authorization-required zones enforce a 0.2 nm buffer. The rollout JSON
-  schema is frozen at v1 (`docs/SCHEMA.md`) for the Day 7 renderer.
+- **Status**: Day 7 soft-launch release candidate. The offline renderer, five
+  fixed Laguna T3 clips, hero GIF, frozen rollout artifacts, and `0.1.1`
+  package candidate are complete. Public Hub publication remains gated on the
+  cold-viewer visual check and an isolated install/eval.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -46,8 +44,16 @@ the model's prose.
   only saved `sim_log` snapshots; model prose is inert.
 
 ### Quickstart
-Clone the repository and create the complete runtime and development
-environment from the locked `pyproject.toml` dependency set:
+
+Install the public Hub release and run a two-example smoke evaluation:
+
+```bash
+prime --plain env install jarrett/uav-operator@0.1.1
+prime --plain eval run uav-operator -n 2 -r 1 --disable-tui
+```
+
+For source development, clone the repository and create the complete runtime
+and development environment from the lockfile:
 
 ```bash
 uv sync --locked --all-groups
@@ -101,6 +107,45 @@ Notes:
   `--max-attempts N` to cap retries; the default `0` is intentionally unlimited.
   Individual rollouts still have a 420-second timeout so one hung provider
   request cannot block the persistent retry loop.
+
+### Offline rollout renderer
+
+The renderer consumes only a saved JSON object containing frozen-schema
+`sim_log`; it never imports, instantiates, or replays the simulator. The map is
+a 2D supervisory-operations display, not a flight-dynamics or 3D collision
+visualization.
+
+```bash
+uv run python scripts/render.py assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
+  -o out.mp4
+
+# Fully offline vector fallback; no tile cache or network required.
+uv run python scripts/render.py assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
+  -o out.mp4 --no-basemap
+```
+
+Each MP4 is 1920×1080, 30 fps, audio-free H.264/yuv420p. The committed README
+GIF is 960 px wide. Basemap attribution appears in the display and downloaded
+tiles are cached under the ignored `.cache/uav-renderer/` directory.
+
+The five clips are fixed zero-based rows from Laguna run
+`day6-t3-clean-retry/results.jsonl`; each compact JSON retains source run, row,
+model, reward, metrics, and the complete `sim_log`:
+
+| Source row | Evidence | Reward | Clip |
+| ---: | --- | ---: | --- |
+| 23 | Treasure Island: four-event safe response (hero) | 0.865 | [MP4](assets/renders/day7/laguna-t3-treasure-island-safe-response.mp4) |
+| 28 | Pier 39: clean composed-event completion | 0.943 | [MP4](assets/renders/day7/laguna-t3-pier-39-clean-completion.mp4) |
+| 4 | Bay Farm: safe completion at 28.9% battery | 0.700 | [MP4](assets/renders/day7/laguna-t3-bay-farm-low-margin.mp4) |
+| 12 | Treasure Island: repeated geofence/override struggle, then success | 0.044 | [MP4](assets/renders/day7/laguna-t3-treasure-island-geofence-struggle.mp4) |
+| 20 | Richmond Channel: battery-depletion aircraft loss | -4.300 | [MP4](assets/renders/day7/laguna-t3-richmond-battery-loss.mp4) |
+
+[View the five-episode trigger/decision/outcome contact sheet](assets/renders/day7/contact-sheet.png).
+
+The hero's pop-up restriction activates while the aircraft is still on the
+ground during mission intake; it is not presented as a mid-flight TFR. A true
+mid-flight TFR clip and a same-seed before/after-training pair remain deferred
+until suitable saved evidence exists.
 
 ### Day 6 post-fix calibration
 
