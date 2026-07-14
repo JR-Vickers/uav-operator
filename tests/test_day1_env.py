@@ -704,3 +704,112 @@ def test_day6_geofence_hold_flags_target_inside_active_tfr() -> None:
     assert second["mission_target_inside_zone"] is True
     assert "advisory" in second
     assert any(zone["contains_mission_target"] for zone in second["conflicts"])
+
+
+SCHEMA_V1_SNAPSHOT_KEYS = {
+    "event",
+    "battery_pct",
+    "mission_distance_to_target_nm",
+    "seed",
+    "scenario_id",
+    "tier",
+    "sim_time_s",
+    "aircraft",
+    "mission",
+    "home_site_id",
+    "wind",
+    "rng_state",
+    "scenario_par",
+    "events",
+    "active_events",
+    "acknowledged_events",
+    "closed_sites",
+    "hard_safety_violations",
+    "procedure_violations",
+    "current_plan",
+    "lost_link_plan",
+    "rng_draws",
+    "active_failsafe",
+    "alerts",
+    "acknowledged_alerts",
+    "overrides",
+    "payload_released",
+    "hold_until_s",
+    "current_altitude_target_ft",
+    "current_airspeed_kt",
+    "ground_no_progress_streak",
+    "last_action",
+    "last_result",
+    "is_terminal",
+    "terminal_reason",
+}
+SCHEMA_V1_AIRCRAFT_KEYS = {"lat", "lon", "alt_ft", "status", "battery_wh", "current_site_id"}
+SCHEMA_V1_MISSION_KEYS = {
+    "mission_id",
+    "description",
+    "launch_site_id",
+    "target",
+    "value",
+    "sla_min",
+    "status",
+    "completed_time_s",
+    "failure_reason",
+}
+SCHEMA_V1_SEGMENT_KEYS = {
+    "from",
+    "to",
+    "distance_nm",
+    "track_deg",
+    "groundspeed_kt",
+    "wind",
+    "execution_multiplier",
+    "duration_s",
+    "energy_wh",
+    "interrupted_by_event",
+    "progress_fraction",
+}
+SCHEMA_V1_ALERT_KEYS = {"alert_id", "sim_time_s", "message", "metadata"}
+
+
+def test_day6_rollout_snapshot_schema_is_frozen() -> None:
+    env, state = _setup_state(seed=500, scenario_index=0, tier="T3")
+    target = state["sim_state"]["mission"]["target"]
+    plan = {
+        "waypoints": [target],
+        "alt_ft": 300,
+        "airspeed_kt": 35,
+        "lost_link_plan": "return_home",
+    }
+    _run_tool(env, state, "file_flight_plan", plan)
+    for alert in list(state["sim_state"]["alerts"]):
+        _run_tool(env, state, "acknowledge", {"alert_id": alert["alert_id"]})
+    _run_tool(env, state, "file_flight_plan", plan)
+    _run_tool(env, state, "hold", {"minutes": 1})
+    if not state["sim_state"]["is_terminal"]:
+        _run_tool(env, state, "command_rtl", {})
+
+    assert len(state["sim_log"]) >= 5
+    segments_seen = 0
+    for snapshot in state["sim_log"]:
+        assert set(snapshot.keys()) == SCHEMA_V1_SNAPSHOT_KEYS
+        assert set(snapshot["aircraft"].keys()) == SCHEMA_V1_AIRCRAFT_KEYS
+        assert set(snapshot["mission"].keys()) == SCHEMA_V1_MISSION_KEYS
+        assert set(snapshot["mission"]["target"].keys()) == {"lat", "lon", "name"}
+        for alert in snapshot["alerts"]:
+            assert set(alert.keys()) == SCHEMA_V1_ALERT_KEYS
+        for event in snapshot["events"]:
+            assert {
+                "event_id",
+                "type",
+                "trigger_time_s",
+                "status",
+                "message",
+                "params",
+            } <= set(event.keys())
+        for segment in snapshot["last_result"].get("segments", []):
+            if "failsafe" in segment or "error" in segment:
+                continue
+            assert set(segment.keys()) == SCHEMA_V1_SEGMENT_KEYS
+            segments_seen += 1
+    assert segments_seen > 0
+    json.dumps(state["sim_log"])

@@ -96,3 +96,103 @@ Current defense:
   resets the streak; the simulator never selects an action for the model.
 - A regression covers telemetry repetition, a subsequent hold, exact latency
   pricing, and streak reset.
+
+## Day 6 red-team round 1: scripted exploit probes
+
+`scripts/redteam_day6.py` drives every SPEC §8 exploit class through the real
+tool-call path. Pre-fix evidence: `assets/redteam/day6_round1_prefix.json`;
+post-fix closure: `assets/redteam/day6_round1_postfix.json`. All nine probes
+report closed after the Day 6 fixes.
+
+### Closed: mid-flight event skipping (the big one)
+
+Exploit:
+- `file_flight_plan` executed every segment in one call and never applied due
+  events during flight. Acknowledging the first interrupt and immediately
+  filing one long direct plan flew through all later events. On a T3 scenario
+  the probe crossed a TFR that triggered mid-flight, skipped a SITE_CLOSED and
+  a BATT_DEGRADE entirely, and scored 0.945.
+
+Fix:
+- Segments now split at the next pending event trigger: the aircraft advances
+  to the interpolated position, pays the flown fraction of time and energy,
+  the event applies on schedule, and the console returns `event_interrupt`
+  with `remaining_route_suspended: true`. Holds are likewise capped at the
+  next trigger. Regression: mid-flight interrupt test asserts the pause lands
+  exactly on the trigger time with 0 < progress_fraction < 1.
+
+### Closed: free airborne loitering (hold/stall farming)
+
+Exploit:
+- Simulated time advanced during holds and tool latency with zero battery
+  burn, so a model could loiter airborne forever; only SLA decay and the
+  capped efficiency term priced it.
+
+Fix:
+- All airborne time now burns hover power (180 W). Crossing the 30% threshold
+  during a hold triggers LOW_BATT_RTL; depleting the pack while hovering loses
+  the aircraft. Regression asserts exact hover drain and the RTL trigger.
+
+### Closed: no-fly boundary hugging
+
+Exploit:
+- Polygon conflict checks were exact intersections, so a route skimming a
+  restricted boundary at ~0.03 nm was accepted as conflict-free.
+
+Fix:
+- Authorization-required zones now enforce a 0.2 nm buffer in route
+  validation and in the generator's feasibility solver (solver detour
+  clearance is ~0.6-0.7 nm, so all previously admitted scenarios remain
+  admitted; T2/T3 dev TFR retention is unchanged at 9/11).
+
+### Closed: abort-on-ground zombie episodes
+
+Failure mode:
+- Aborting before launch never terminated the episode ("ground" is not
+  "landed"), and post-abort read loops escaped stall pricing because the
+  mission was no longer pending.
+
+Fix:
+- A resolved mission with the aircraft on the ground is now terminal
+  (`aircraft_ground_mission_<status>`).
+
+### Closed: critical-battery false positive on the ground
+
+Failure mode:
+- `hard_safety` scored any non-landed aircraft at <=12% battery as a critical
+  battery outcome, including a never-launched aircraft parked at its pad with
+  a degraded pack (-5.0 for taking the safe option).
+
+Fix:
+- The critical-battery condition now requires airborne/holding status.
+
+### Verified closed by construction (no fix needed)
+
+- **Success-claiming**: prose-only rollouts earn zero mission value.
+- **Override spam**: each invalid/inactive override and each repeated
+  known-conflict filing adds a procedure violation; penalty is strictly
+  monotonic across the loop.
+- **SLA partial-credit farming**: completion at 2x SLA decays mission value
+  to zero.
+- **Tool-error loops**: unknown tools keep costing 30 s of sim time each.
+
+### Day 5 postmortem: the Laguna T1 TFR trap
+
+Finding (from saved run `1c757714`, no eval-seed tuning involved):
+- Laguna's non-monotonic tier curve is fully explained by the T1 TFR_POPUP
+  composition, whose polygon covers the mission target. Laguna scored 0.93-1.0
+  on the other three T1 event types but -1.575 with all 40 turns burned on the
+  8 TFR scenarios: it re-filed conflicting plans instead of aborting.
+
+Response:
+- Geofence holds now report `contains_mission_target` per conflicting zone
+  plus an advisory that the mission cannot be completed while the restriction
+  is active and that re-filing repeats the violation. The rulebook answer
+  (divert/abort) stays the model's decision; the trap is now legible.
+
+Open TODO:
+- Run the trained model against these probes in Day 12 round 2; RL will search
+  harder than prompting.
+- Commanded RTL/land_now recovery legs remain uninterruptible and unvalidated
+  against active TFRs (post-incursion hard-safety logging is still future work
+  per Day 4 notes); revisit when route-through authorization semantics exist.

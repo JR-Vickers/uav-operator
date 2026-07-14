@@ -17,13 +17,14 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 5 complete: seeded T0-T3 generation, composed-event
-  feasibility checks, a 300/60/60 train/dev/final-eval split, loop-regression
-  pricing with structured ground-stall warnings, TFR-preserving
-  outbound/recovery solver admission, scripted calibration, deterministic sim
-  logging, canonical hard-safety outcome scoring, the full SPEC §3.2 console,
-  and a clean GPT-4.1-nano frontier calibration curve. Day 6 red-team round 1
-  is next.
+- **Status**: Day 6 red-team round 1 complete: scripted probes covered every
+  SPEC §8 exploit class; five exploits closed with regression tests
+  (mid-flight event skipping, free airborne loitering, no-fly boundary
+  hugging, abort-on-ground zombie episodes, and a ground critical-battery
+  false penalty) and four verified closed by construction. Events now
+  interrupt flight mid-segment, airborne time burns hover power, and
+  authorization-required zones enforce a 0.2 nm buffer. The rollout JSON
+  schema is frozen at v1 (`docs/SCHEMA.md`) for the Day 7 renderer.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -118,10 +119,18 @@ GPT-4.1-nano shows the intended monotonic difficulty curve: T0 is near ceiling,
 T1 is materially harder, and T2/T3 fall below zero as composed interrupts and
 turn-cap failures increase. Laguna is near ceiling on T0 and substantially
 stronger on T2/T3, but its high-variance T1 result makes its curve non-monotonic.
-That model-specific interaction is calibration evidence to investigate rather
-than hide. All 240 plotted rollouts are free of provider errors and hard-safety
+All 240 plotted rollouts are free of provider errors and hard-safety
 violations. The machine-readable results and provenance are in
 [`assets/evals/day5_frontier_calibration.json`](assets/evals/day5_frontier_calibration.json).
+
+Day 6 resolved the Laguna T1 anomaly from the saved rollouts: the T1
+`TFR_POPUP` composition places the restriction over the mission target, and
+Laguna scored 0.93-1.0 on the other three T1 event families but -1.575 on the
+TFR scenarios, burning all 40 turns re-filing conflicting plans instead of
+aborting. Geofence holds now flag `mission_target_inside_zone` so that trap is
+legible. Note the Day 6 simulator changes (mid-segment event interrupts, hover
+energy, airspace buffer) supersede this curve; it will be regenerated before
+the Day 7 soft launch.
 
 ### Taskset Config
 Planned fields:
@@ -134,6 +143,7 @@ Planned fields:
 | `max_examples` | int | `-1` | Limit on dataset size; use `-1` for all generated examples. |
 | `wind_enabled` | bool | `true` | Enable seeded Day 3 wind field and altitude shear. |
 | `gust_front_probability` | float | `0.5` | Probability that an episode includes a gust front. |
+| `system_prompt` | string | ops-manual prompt | Override the operator system prompt (used for red-team/adversarial runs). |
 
 ### Harness Config
 Planned fields:

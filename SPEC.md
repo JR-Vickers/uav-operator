@@ -91,6 +91,10 @@ This is only a serious RL environment if it clears these checks by v0.1:
   enum so reward logic can price it without parsing prose. Overriding
   `LOW_BATT_RTL` with margin that physics later validates = good judgment;
   override followed by `CRIT_BATT_LAND` in the water = the money screenshot.
+- Day 6 energy/time invariants: all airborne time burns hover power (180 W),
+  including holds and decision latency; `LOW_BATT_RTL` fires when a hold
+  crosses the 30% threshold, and hovering to depletion loses the aircraft.
+  Waiting on the ground costs time only — loitering airborne costs battery.
 
 ## 3. Interface to the model
 
@@ -112,6 +116,15 @@ Act: `file_flight_plan(waypoints, alt_ft, airspeed_kt, lost_link_plan)`,
 - Plans are validated on filing: airspace conflicts and infeasible segments
   are returned as structured warnings (operator may file anyway — knowingly
   filing through a TFR is on them, and on the reward).
+- Predicted passage within 0.2 nm of an authorization-required zone counts as
+  a conflict (Day 6 boundary-hugging fix); the buffer also applies inside the
+  generator's feasibility solver so admitted scenarios stay flyable.
+- Events interrupt flight mid-segment (Day 6): when a pending event triggers
+  while a filed route is executing, the segment is cut at the trigger time
+  (interpolated position, partial time/energy), the remaining route is
+  suspended, and the console returns an `event_interrupt`. Holds are capped at
+  the next trigger the same way. Geofence holds report whether a conflicting
+  zone contains the mission target so an impossible mission is legible.
 - Every ordinary tool call costs 10–30s sim time (decision latency is real).
   Repeated ground-state observation/hold calls without mission progress receive
   a structured warning and escalating additional decision latency.
@@ -152,7 +165,7 @@ The generator verifies each scenario has ≥1 feasible resolution path
 | Component | Weight | Definition |
 |---|---|---|
 | mission_value | +1.0 scale | Per-mission value × completion × timeliness decay (briefed SLA curve); partial credit only where briefed |
-| hard_safety | −5.0 each, may terminate | Logged aircraft loss and critical-battery airborne outcomes; TFR/airspace incursions join here as dynamic incursion logging matures |
+| hard_safety | −5.0 each, may terminate | Logged aircraft loss and critical-battery outcomes while airborne/holding (never on the ground); TFR/airspace incursions join here as dynamic incursion logging matures |
 | margin_policy | −0.0..−1.0 shaped | Landing reserve below briefed 20%, poor-outcome overrides, min-safe-alt violations |
 | procedure | −0.1 each | Unacknowledged alerts, filing through known conflicts, expired holds |
 | efficiency | −0.3 scale | Energy + sim-time cost normalized by generated scenario par |
@@ -211,3 +224,10 @@ farming (time decay must dominate), boundary-hugging TFR polygons (buffer
 check), override-spam (justification enum + outcome pricing), abort-everything
 conservatism (mission_value opportunity cost), partial-credit farming,
 tool-error time-wasting loops.
+
+Round 1 status (Day 6): all classes above probed via
+`scripts/redteam_day6.py`; five exploits found and closed with regressions
+(mid-flight event skipping, free airborne loitering, boundary hugging,
+abort-on-ground non-termination, ground critical-battery false positive) and
+four verified closed by construction. Evidence in `assets/redteam/` and
+`docs/HACKS.md`. The rollout JSON schema is frozen at v1 in `docs/SCHEMA.md`.
