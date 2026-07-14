@@ -813,3 +813,31 @@ def test_day6_rollout_snapshot_schema_is_frozen() -> None:
             segments_seen += 1
     assert segments_seen > 0
     json.dumps(state["sim_log"])
+
+
+def test_day6_none_content_assistant_messages_are_sanitized_for_replay() -> None:
+    env, state = _setup_state(seed=42, scenario_index=0, tier="T0")
+    state["trajectory"] = [
+        {
+            "prompt": [{"role": "user", "content": "briefing"}],
+            "completion": [
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": None,
+                    "reasoning_content": "internal reasoning without a tool call",
+                }
+            ],
+        }
+    ]
+
+    messages = asyncio.run(env.get_prompt_messages(state))
+
+    def _field(message: Any, name: str) -> Any:
+        return message.get(name) if isinstance(message, dict) else getattr(message, name, None)
+
+    assistants = [m for m in messages if _field(m, "role") == "assistant"]
+    assert assistants
+    for message in assistants:
+        if not _field(message, "tool_calls"):
+            assert _field(message, "content") == ""

@@ -2697,6 +2697,35 @@ def _tool_call_field(tool_call: Any, field_name: str) -> Any:
     return getattr(tool_call, field_name)
 
 
+def _sanitize_assistant_message(message: Any) -> Any:
+    """Replace None content on tool-call-free assistant turns for API replay.
+
+    Some providers emit reasoning-only assistant messages with null content and
+    then reject their own message history with a 422 unless content is a
+    string. Reward never reads message content, so this is transport-only.
+    """
+
+    if isinstance(message, Mapping):
+        if (
+            message.get("role") == "assistant"
+            and message.get("content") is None
+            and not message.get("tool_calls")
+        ):
+            patched = dict(message)
+            patched["content"] = ""
+            return patched
+        return message
+    if (
+        getattr(message, "role", None) == "assistant"
+        and getattr(message, "content", None) is None
+        and not getattr(message, "tool_calls", None)
+    ):
+        copy_fn = getattr(message, "model_copy", None)
+        if callable(copy_fn):
+            return copy_fn(update={"content": ""})
+    return message
+
+
 def _state_sim(state: vf.State) -> SimState:
     wind_payload = state["sim_state"].get("wind")
     wind = (
@@ -2946,6 +2975,15 @@ class UAVOperatorEnv(vf.MultiTurnEnv):
         self.wind_enabled = wind_enabled
         self.gust_front_probability = gust_front_probability
         super().__init__(**kwargs)
+
+    async def get_prompt_messages(self, state: vf.State) -> vf.Messages:
+        messages = await super().get_prompt_messages(state)
+        if isinstance(messages, list):
+            return cast(
+                vf.Messages,
+                [_sanitize_assistant_message(message) for message in messages],
+            )
+        return messages
 
     async def setup_state(self, state: vf.State) -> vf.State:
         info = state.get("info", {})
