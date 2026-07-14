@@ -23,7 +23,7 @@ from matplotlib.patches import Polygon, Rectangle
 
 ROOT = Path(__file__).resolve().parents[1]
 WORLD_PATH = ROOT / "data" / "world.json"
-DEFAULT_CACHE = ROOT / ".cache" / "uav-renderer" / "bay-area-dark.tif"
+DEFAULT_CACHE = ROOT / ".cache" / "uav-renderer" / "bay-area-dark-z11.tif"
 
 BG = "#071019"
 PANEL = "#0d1924"
@@ -45,8 +45,8 @@ class RenderError(ValueError):
         self.message = message
         self.path = path
 
-    def payload(self) -> dict[str, str]:
-        return {"ok": "false", "error": self.code, "message": self.message, "path": self.path}
+    def payload(self) -> dict[str, Any]:
+        return {"ok": False, "error": self.code, "message": self.message, "path": self.path}
 
 
 @dataclass(frozen=True)
@@ -382,7 +382,11 @@ def _add_basemap(ax: Axes, extent: tuple[float, float, float, float], cache: Pat
         ) from exc
     cache.parent.mkdir(parents=True, exist_ok=True)
     if not cache.exists():
-        west, east, south, north = extent
+        world_bbox = load_world()["bbox"]
+        west = float(world_bbox["min_lon"])
+        east = float(world_bbox["max_lon"])
+        south = float(world_bbox["min_lat"])
+        north = float(world_bbox["max_lat"])
         try:
             cx.bounds2raster(
                 west,
@@ -390,7 +394,7 @@ def _add_basemap(ax: Axes, extent: tuple[float, float, float, float], cache: Pat
                 east,
                 north,
                 str(cache),
-                zoom=12,
+                zoom=11,
                 source=cx.providers.CartoDB.DarkMatterNoLabels,
                 ll=True,
                 use_cache=True,
@@ -516,6 +520,29 @@ def _reward_text(artifact: Mapping[str, Any]) -> str:
     return f"REWARD  {float(reward):+.3f}"
 
 
+def _decision_label(log: Sequence[Mapping[str, Any]]) -> str:
+    actions = [str(item.get("last_action", "")) for item in log]
+    override_count = actions.count("override_failsafe")
+    filing_count = actions.count("file_flight_plan")
+    if "lost" in str(log[-1].get("terminal_reason")) and "land_now" in actions:
+        return "LAND NOW · TOO LATE"
+    if override_count >= 2:
+        return f"{override_count}× OVERRIDE + {filing_count}× REFILE"
+    if "amend_route" in actions:
+        return "AMEND ROUTE"
+    if "land_now" in actions:
+        return "LAND NOW"
+    if "command_rtl" in actions:
+        return "COMMAND RTL"
+    return "MONITOR"
+
+
+def _cold_summary(log: Sequence[Mapping[str, Any]]) -> str:
+    events = [str(item.get("type", "EVENT")).replace("_", " ") for item in event_catalog(log).values()]
+    outcome, _ = terminal_label(log[-1])
+    return f"MISSION  →  {' + '.join(events)}  →  {_decision_label(log)}  →  {outcome}"
+
+
 def render_artifact(
     artifact: Mapping[str, Any],
     output: Path,
@@ -527,7 +554,11 @@ def render_artifact(
     """Render one validated artifact to MP4 or GIF."""
 
     data = validate_artifact(dict(artifact))
-    config = config or RenderConfig(fps=12 if output.suffix.lower() == ".gif" else 30)
+    config = config or (
+        RenderConfig(width=960, height=540, fps=12)
+        if output.suffix.lower() == ".gif"
+        else RenderConfig()
+    )
     if output.suffix.lower() not in {".mp4", ".gif"}:
         raise RenderError("unsupported_output", "Output extension must be .mp4 or .gif", str(output))
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -594,7 +625,7 @@ def render_artifact(
     reward_text = hud.text(0.06, 0.065, _reward_text(data), color=TEXT, fontsize=14, fontweight="bold")
 
     footer_label = footer.text(0.018, 0.58, "MISSION INTAKE · REVIEW AIRSPACE / WEATHER / RESERVE", color=AMBER, fontsize=11, fontweight="bold", va="center")
-    footer_detail = footer.text(0.018, 0.18, "Saved simulator evidence · model prose is not scored", color=MUTED, fontsize=7)
+    footer_detail = footer.text(0.018, 0.18, _cold_summary(log), color=MUTED, fontsize=7)
     terminal_box = footer.text(
         0.98,
         0.5,
@@ -671,7 +702,9 @@ def render_artifact(
             footer_label.set_text("OPERATOR DECISION LOGGED · AUTOPILOT ADVANCING")
             footer_label.set_color(CYAN)
         footer_detail.set_text(
-            f"EVENTS: {_event_summary(snapshot)}  ·  MISSION: {str(snapshot['mission']['status']).upper()}"
+            _cold_summary(log)
+            if index == 0
+            else f"EVENTS: {_event_summary(snapshot)}  ·  MISSION: {str(snapshot['mission']['status']).upper()}"
         )
         if snapshot["is_terminal"]:
             label, outcome_color = terminal_label(snapshot)
@@ -733,11 +766,7 @@ def render_contact_sheet(artifacts: Sequence[Mapping[str, Any]], output: Path) -
         final = log[-1]
         outcome, color = terminal_label(final)
         events = [str(item.get("type", "EVENT")) for item in event_catalog(log).values()]
-        actions = [str(item.get("last_action", "")) for item in log]
-        decisive = next(
-            (action for action in reversed(actions) if action in {"amend_route", "command_rtl", "land_now", "override_failsafe"}),
-            actions[-1],
-        )
+        decisive = _decision_label(log)
         ax.set_facecolor(PANEL)
         ax.set_xticks([])
         ax.set_yticks([])
@@ -747,7 +776,7 @@ def render_contact_sheet(artifacts: Sequence[Mapping[str, Any]], output: Path) -
         ax.text(0.02, 0.28, "TRIGGER", transform=ax.transAxes, color=MUTED, fontsize=7, fontweight="bold")
         ax.text(0.14, 0.28, " + ".join(events), transform=ax.transAxes, color=AMBER, fontsize=9)
         ax.text(0.47, 0.28, "DECISION", transform=ax.transAxes, color=MUTED, fontsize=7, fontweight="bold")
-        ax.text(0.57, 0.28, decisive.replace("_", " ").upper(), transform=ax.transAxes, color=CYAN, fontsize=9)
+        ax.text(0.57, 0.28, decisive, transform=ax.transAxes, color=CYAN, fontsize=9)
         ax.text(0.98, 0.62, outcome, transform=ax.transAxes, color=color, fontsize=11, fontweight="bold", ha="right")
         ax.text(0.98, 0.2, _reward_text(artifact), transform=ax.transAxes, color=TEXT, fontsize=9, ha="right")
     fig.suptitle("DAY 7 · FIVE FROZEN T3 OPERATIONS", color=CYAN, fontsize=17, fontweight="bold", x=0.02, ha="left")
