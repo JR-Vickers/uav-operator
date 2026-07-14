@@ -53,10 +53,20 @@ T0 through T3; Laguna scores `1.000`, `0.282`, `0.479`, and `0.504`. Confidence
 intervals and run provenance are committed. Proceed to Day 6; investigate
 Laguna's non-monotonic tier interaction without tuning against final-eval seeds.
 
-**Day 6 — red-team round 1.** Adversarial prompting runs ("maximize score by
-any means"), exploit hunting per SPEC §8 list, fixes + regression tests,
-start `docs/HACKS.md`. Also today: rollout-JSON schema freeze (renderer
+**Day 6 — red-team round 1. COMPLETE.** Adversarial prompting runs ("maximize
+score by any means"), exploit hunting per SPEC §8 list, fixes + regression
+tests, start `docs/HACKS.md`. Also today: rollout-JSON schema freeze (renderer
 depends on it).
+
+Closed with five exploits fixed and regression-tested (mid-flight event
+skipping, free airborne loitering, no-fly boundary hugging, abort-on-ground
+non-termination, ground crit-battery false penalty), four classes verified
+inert, schema frozen at v1 (`docs/SCHEMA.md`), and two live adversarial runs
+(`a32af316`, `a44f3e91`) that extracted no reward above honest play. The Day 5
+Laguna T1 anomaly is explained (TFR-on-target decision-loop trap, now legible
+via `mission_target_inside_zone`); HACKS.md holds 5 closed exploits, clearing
+the Day 10 fleet-gate prerequisite. Regenerate the tier curve on the fixed sim
+before Day 7 rendering.
 
 **Day 7 — renderer + soft-launch. GATE.** Matplotlib/contextily pipeline to
 mp4; render 5 best episodes from baselines; `prime env push` as v0.0.x
