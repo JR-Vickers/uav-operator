@@ -1,5 +1,42 @@
 # HANDOFF.md
 
+## 2026-07-15 Blocked-mode Phase 3 replan
+
+Current state:
+
+- Platform tickets have been submitted for the Llama free-tier environment
+  denial and the Laguna XS training-policy `ModelError`; both await a response.
+- Day 8 remains blocked. Ticket submission does not authorize a retry, and no
+  training command should be launched merely because either model remains
+  listed as available or free.
+- `PLAN.md` now contains the authoritative blocked-mode parallel plan. The
+  simulator, reward semantics, dataset seeds, and final-eval split are frozen.
+  T4 fleet scope is cut.
+- `docs/DAY8_FREE_TRAINING.md` records the Laguna renderer/revision hypothesis,
+  its uncertainty, why a matched rollback must be platform-side, and the exact
+  conditions for another diagnostic.
+
+Next actions that do not require training:
+
+1. Build checkpoint evaluation and curve/same-seed comparison tooling using
+   explicitly synthetic fixtures and strict provenance validation.
+2. Parameterize the trained-model red-team runner without changing simulator or
+   reward behavior.
+3. Draft training-independent writeup sections, README/leaderboard structure,
+   and a video rough cut with empty training-evidence slots.
+4. Complete repository/release hygiene and prepare additional baseline configs;
+   obtain explicit approval before any nonzero-cost inference run.
+
+Unblock condition:
+
+- Resume with a fresh one-step diagnostic only after Prime confirms a material
+  eligibility or deployment change, or a new compatible free Hosted model is
+  verified. Re-run the full preflight and obtain explicit user approval. A
+  passing one-step diagnostic is required before the 50-step smoke.
+- If the publishing deadline arrives first, remove the learned-model claim and
+  ship an honest environment, calibration, red-team, renderer, and platform-
+  postmortem story. Fixtures and step-0 baselines are never learning evidence.
+
 ## 2026-07-15 Free Llama Day 8 gates prepared
 
 Outcome update:
@@ -40,10 +77,8 @@ Live preparation check:
   launch. No training command was invoked during preparation.
 
 Next action:
-- Run the diagnostic preflight, present its artifact and exact manual command,
-  and wait for explicit approval. The user—not the agent—launches the training
-  command without `--yes`. Do not preflight or launch the smoke unless the
-  one-step diagnostic passes every acceptance condition.
+- Superseded by the blocked-mode replan above. Do not rerun this diagnostic
+  unchanged; wait for a material platform eligibility change.
 
 ## 2026-07-15 Day 8 smoke stopped at step 0
 

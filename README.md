@@ -23,7 +23,10 @@ the model's prose.
   is blocked. Both Laguna XS runs stopped at step 0; the free Llama diagnostic
   was rejected before run creation because this environment does not meet an
   undisclosed free-tier eligibility rule. All attempts cost `$0`; the 50-step
-  smoke is not authorized.
+  smoke is not authorized. Platform tickets are pending. Training-independent
+  evaluation tooling, documentation, media preparation, and release hygiene
+  continue, but this project makes no learned-model claim without a successful
+  checkpoint evaluation.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -116,13 +119,15 @@ Notes:
 ### Day 8 Hosted Training smoke
 
 Hosted Training now owns orchestration, training, inference, and infrastructure
-selection, so the current workflow uses one config instead of separate
-orchestrator/trainer/inference TOMLs or a manually selected pod. The next
-ordered gate is
+selection, so the workflow uses one config instead of separate
+orchestrator/trainer/inference TOMLs or a manually selected pod. The intended
+ordered gate remains
 [`configs/day8_llama_1b_t1_diagnostic.toml`](configs/day8_llama_1b_t1_diagnostic.toml):
 one optimizer step on `sprints/Llama-3.2-1B-Instruct`, with batch 16, two
 rollouts/example, at most four in flight, eight T1 train rows, two T1 dev rows,
-and a 20-turn cap. Only if it passes may
+and a 20-turn cap. The backend eligibility denial currently prevents this gate
+from being retried; the config is retained for a verified platform fix. Only if
+the diagnostic eventually passes may
 [`configs/day8_llama_1b_t1_smoke.toml`](configs/day8_llama_1b_t1_smoke.toml)
 run 50 steps with the same workload controls, all 75 T1 train rows, and
 baseline/every-10-step evaluation over all 15 disjoint T1 dev rows. Neither
@@ -134,7 +139,8 @@ and inference output immediately before each launch. A paid model is not a
 fallback. Llama 3.2 1B is a legitimate small open-model pipeline candidate,
 but a successful smoke alone would not prove that it learned the task.
 
-Generate a reproducible preflight immediately before the diagnostic:
+If Prime affirmatively restores eligibility, generate a reproducible preflight
+immediately before the diagnostic:
 
 ```bash
 uv run python scripts/capture_day8_training.py preflight \

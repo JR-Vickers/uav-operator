@@ -108,10 +108,11 @@ Day 8 has three ordered gates:
    cost. This proves the published environment can execute functional model
    rollouts. It does not prove that Hosted Training works or that reward rises.
 2. **One-step Hosted Training diagnostic — BLOCKED.** Use a model in the live
-   Hosted Training catalog that is still effectively free. The current
-   candidate is `sprints/Llama-3.2-1B-Instruct`, subject to a fresh availability,
-   capacity, exact model-ID/client compatibility, pricing, wallet, and Hub
-   quality-action preflight. Keep this diagnostic deliberately small (one
+   Hosted Training catalog that is still effectively free. The attempted
+   candidate was `sprints/Llama-3.2-1B-Instruct`, subject to availability,
+   capacity, exact model-ID/client compatibility, pricing, wallet, Hub
+   quality-action, and promotional-eligibility checks. Keep this diagnostic
+   deliberately small (one
    training step, batch 16, two rollouts/example, at most four in flight) and
    use a 20-turn cap to bound the looping behavior observed in the functional
    eval. Passing requires one real optimizer step, finite metrics, retrievable
@@ -174,10 +175,68 @@ The subsequent renderer-client reproduction returned HTTP 404 for the exact
 Hosted model ID, while the live inference catalog listed only the distinct
 zero-cost `poolside/laguna-m.1`. Use the committed two-row Laguna M.1 functional
 eval as the completed environment/tool-loop gate. Laguna M.1 is not in the
-Hosted Training catalog and cannot be substituted into the training TOML. The
-next diagnostic therefore uses a separately verified free Hosted Training
-candidate; absence from the ordinary inference catalog is a compatibility risk
-to test, not grounds to switch to a paid model.
+Hosted Training catalog and cannot be substituted into the training TOML. That
+finding led to the separate free Llama diagnostic, which the backend denied on
+environment eligibility as recorded above. There is currently no authorized
+next candidate; absence from the ordinary inference catalog remains a
+compatibility risk to test, not grounds to switch to a paid model.
+
+### Blocked-mode parallel plan (active while Day 8 is unresolved)
+
+Day 8 blocks the project's training evidence, not the completed environment.
+The simulator, reward semantics, dataset seeds, public Hub package, functional
+tool loop, calibration, first red-team round, rollout schema, and renderer are
+already proven independently. While the submitted platform tickets are open,
+continue only work that remains valid regardless of which compatible free model
+eventually trains.
+
+The simulator and reward are frozen during blocked mode. Do not tune them,
+select a curriculum, or change turn/context controls without sampled training
+rollouts that identify a concrete defect. Never use final-eval seeds for
+preparation. Generated test inputs and synthetic metrics must be labeled
+`fixture` or `synthetic`; they are plumbing tests and must never appear in a
+project result, chart, leaderboard, or learning claim.
+
+Work authorized in parallel:
+
+1. Build a checkpoint-evaluation command that accepts a real adapter/checkpoint
+   identifier, evaluates the frozen dev split, preserves seed provenance, and
+   emits machine-readable results suitable for curve generation.
+2. Build curve, milestone-comparison, and same-seed before/after tooling against
+   explicitly synthetic fixtures, with finite-number, missing-step, provider-
+   error, and seed-isolation validation. Populate it only with captured runs.
+3. Parameterize the Day 12 adversarial runner for a future trained adapter while
+   preserving all Day 6 evidence and state-only reward checks.
+4. Draft the writeup sections that do not depend on training: the layer model,
+   simulator abstraction, state-only reward, curriculum construction, frontier
+   calibration, closed exploits, renderer, limitations, and the Hosted Training
+   blocker. Leave curve, learned behavior, and trained-model conclusions empty.
+5. Prepare the README/leaderboard structure and additional frozen baseline eval
+   configs. Any run with a nonzero effective price requires a cost estimate and
+   explicit approval. Do not represent an inference-only model as the Hosted
+   Training base model.
+6. Produce a video rough cut from existing evidence with reserved, visibly
+   incomplete slots for a real curve and same-seed trained comparison. Complete
+   repository hygiene, license, isolated-install checks, and release checklists,
+   but do not publish a trained-model release claim.
+
+Evidence-dependent work remains blocked: the Day 9 curriculum decision, the
+50-step smoke, main-run sizing and launch, checkpoint selection, a real learning
+curve, trained-model leaderboard results, same-seed before/after renders, and
+Day 12 red-team round 2. T4 fleet scope is cut under the Day 10 gate and belongs
+only in future work.
+
+There are two honest exits from blocked mode:
+
+- **Training restored.** Prime confirms a material eligibility/deployment fix or
+  a compatible free model becomes available. Run a fresh exact-config preflight,
+  present its artifact and manual command, obtain explicit approval, and return
+  to the one-step diagnostic. Only a passing diagnostic authorizes the 50-step
+  smoke; only a passing smoke authorizes curriculum selection and a main run.
+- **Deadline arrives while blocked.** Ship the environment, calibration,
+  red-team, renderer, and platform postmortem as an environment-only project.
+  Remove or rewrite the canonical "I taught a small open model" claim everywhere;
+  do not use planned configs, fixtures, or step-0 baselines as learning evidence.
 
 ## Phase 3 — the money shots (Days 10–14)
 
