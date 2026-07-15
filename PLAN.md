@@ -207,12 +207,16 @@ Work authorized in parallel:
    tooling against explicitly synthetic fixtures, with finite-number,
    missing-step, provider-error, and seed-isolation validation. Populate it
    only with captured runs.
-3. Parameterize the Day 12 adversarial runner for a future trained adapter while
-   preserving all Day 6 evidence and state-only reward checks.
-4. Draft the writeup sections that do not depend on training: the layer model,
-   simulator abstraction, state-only reward, curriculum construction, frontier
+3. **COMPLETE.** Parameterize the Day 12 adversarial runner for a future trained
+   adapter while preserving all Day 6 evidence and state-only reward checks.
+   The prepared T2/T3 configs are manual-only; captured mode rejects fixtures,
+   and nonzero pricing requires a token estimate plus explicit approval.
+4. **COMPLETE.** Draft the training-independent article and six-post thread:
+   layer model, simulator abstraction, state-only reward, curriculum,
    calibration, closed exploits, renderer, limitations, and the Hosted Training
-   blocker. Leave curve, learned behavior, and trained-model conclusions empty.
+   blocker. Curve, checkpoint selection, learned behavior, trained leaderboard,
+   same-seed comparison, and round-two conclusions remain explicit evidence
+   placeholders that synthetic fixtures may never fill.
 5. Prepare the README/leaderboard structure and additional frozen baseline eval
    configs. Any run with a nonzero effective price requires a cost estimate and
    explicit approval. Do not represent an inference-only model as the Hosted
@@ -261,11 +265,13 @@ order — reward scale, task too hard (shift mix toward T1/T2), context
 truncation. A modest-but-real curve on T1–T2 with honest analysis beats a
 flat curve on T3. Adjust claim to match evidence, not vice versa.
 
-**Day 12 — red-team round 2 + writeup draft.** Run the *trained* model
-adversarially — RL-discovered exploits are the best content in the whole
-project; document + fix (or document honestly as open). Draft writeup: the
-layer-model argument, prior-art positioning (RESEARCH.md), reward design +
-hacks narrative, curve, limitations. Draft the thread (RESEARCH.md outline).
+**Day 12 — red-team round 2 + writeup draft. PARTIALLY COMPLETE / EVIDENCE
+BLOCKED.** The future trained-model adversarial runner and training-independent
+article/thread drafts are complete. The runner has not been executed because no
+trained adapter exists. Learning-curve, checkpoint, learned-behavior,
+trained-leaderboard, same-seed, and round-two findings remain empty. When
+training is restored, run the *trained* model adversarially, then document and
+fix any exploit (or document it honestly as open).
 
 **Day 13 — polish + package.** README final (leaderboard, tables, GIFs);
 `prime env push` v0.1.0; blog post final; video cut (≤90s: hook clip → tier

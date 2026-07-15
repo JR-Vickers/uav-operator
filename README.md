@@ -27,6 +27,10 @@ the model's prose.
   evaluation tooling, documentation, media preparation, and release hygiene
   continue, but this project makes no learned-model claim without a successful
   checkpoint evaluation.
+- **Day 12 preparation**: The trained-adapter adversarial protocol is prepared
+  but has not been executed. The technical article and launch thread are
+  unpublished, training-incomplete drafts with explicit evidence gates; they
+  are planning documents, not project results.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -230,6 +234,28 @@ hashes before producing a curve-ready JSON, reward plot, and ranked same-seed
 before/after candidates. Synthetic plumbing uses fixture provenance and a
 watermarked plot; captured mode rejects it. No synthetic fixture is a project
 result.
+
+### Future trained-adapter red-team round
+
+[`scripts/redteam_day12.py`](scripts/redteam_day12.py) prepares separate frozen
+T2/T3 adversarial configs from a ready training-evidence adapter manifest. It
+preserves the exact committed Day 6 prompt, uses six dev seeds per tier with
+one rollout each, saves simulator state/logs, records price and wallet
+provenance, and emits manual commands only. Nonzero inference pricing requires
+an input-token estimate and explicit cost approval before either command runs.
+
+Its `summarize` command accepts exactly one T2 and one T3 saved run, rejects
+seed leakage, provider errors, malformed logs, fixture provenance in captured
+mode, and any reward mismatch. Every reward component is recomputed from
+`sim_log`; prompt, answer, completion, and other model prose are never
+inspected. The protocol is mechanically tested with ignored synthetic
+fixtures, but no trained adapter or Day 12 result exists.
+
+The [unpublished technical article draft](docs/WRITEUP_DRAFT.md) and
+[not-for-publication thread draft](docs/THREAD_DRAFT.md) use only committed
+training-independent evidence. Their curve, checkpoint, learned-behavior,
+trained-leaderboard, same-seed, and round-two sections remain explicit evidence
+placeholders that fixtures may not fill.
 
 The historical Laguna diagnostic was
 [`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).

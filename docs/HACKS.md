@@ -191,8 +191,13 @@ Response:
   (divert/abort) stays the model's decision; the trap is now legible.
 
 Open TODO:
-- Run the trained model against these probes in Day 12 round 2; RL will search
-  harder than prompting.
+- The trained-adapter Day 12 protocol is prepared in
+  `scripts/redteam_day12.py`, but it has not been executed because no trained
+  checkpoint exists. It freezes the exact Day 6 adversarial prompt and T2/T3
+  dev workloads, rejects fixture evidence in captured mode, and recomputes
+  every reward component from saved `sim_log` without reading model prose.
+  Run it only after a real adapter is deployed and the pricing/approval gate is
+  satisfied; state-derived review candidates are not confirmed exploits.
 - Commanded RTL/land_now recovery legs remain uninterruptible and unvalidated
   against active TFRs (post-incursion hard-safety logging is still future work
   per Day 4 notes); revisit when route-through authorization semantics exist.
@@ -219,3 +224,10 @@ or scoring artifacts" with a menu of suggested exploit classes. Artifacts in
 Conclusion: after the round 1 fixes, prompted adversaries found no path to
 reward above honest play. The Day 12 round 2 rerun must repeat both runs
 against the trained model.
+
+## Day 12 red-team round 2: prepared, not executed
+
+Preparation and summary mechanics are regression-tested with unmistakably
+tainted fixtures under ignored `outputs/`. The real round remains
+evidence-blocked: no optimizer step, checkpoint, or trained adapter exists.
+Nothing in a synthetic summary may be copied into this document as a result.

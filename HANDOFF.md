@@ -1,5 +1,44 @@
 # HANDOFF.md
 
+## 2026-07-15 Day 12 non-blocked preparation and drafts
+
+Changed:
+
+- Added `scripts/redteam_day12.py` with manual-only `prepare` and state-only
+  `summarize` commands for a future trained adapter. Preparation freezes six
+  T2 and six T3 dev rows, preserves the exact Day 6 adversarial prompt, records
+  adapter/checkpoint/run/config/pricing/wallet provenance, and gates nonzero
+  prices on an explicit input-token estimate and approval.
+- Summarization validates the exact model/workload/config hashes, seed
+  isolation, full logs, finite metrics/tokens, provider success, and turn-cap
+  outcomes. It recomputes all reward components and the total from `sim_log`
+  and never reads prompt, answer, completion, or other model prose.
+- Added 17 focused tests and an ignored synthetic end-to-end demonstration.
+  Fixture taint survives into every output, and captured mode rejects it.
+- Re-ran the Day 6 scripted probes: all nine classes remain closed. Existing
+  Day 6 scripts and committed evidence are unchanged.
+- Added `docs/WRITEUP_DRAFT.md` and `docs/THREAD_DRAFT.md`, prominently labeled
+  unpublished/training-incomplete. They use committed Day 5/6 and platform
+  evidence only and retain empty gates for every learning-dependent claim.
+- Marked blocked-mode items 3–4 complete and linked the drafts from README
+  without presenting them as results. Simulator, rewards, scenarios, seeds,
+  package contents, and training configs remain frozen.
+
+Evidence status:
+
+- No inference, deployment, training, or paid action was launched. The real
+  Day 12 round remains unexecuted because no trained adapter exists.
+- No optimizer step, checkpoint, learning curve, learned behavior,
+  trained-model leaderboard, same-seed trained comparison, or round-two
+  finding exists. Synthetic fixtures may not fill those gaps.
+- Day 8 remains blocked by the recorded free Hosted Training failures and
+  eligibility denial. Unsupported learning claims remain prohibited.
+
+Next action:
+
+- Continue blocked-mode item 5 or 6. If training access is restored, return to
+  the one-step diagnostic gate; do not jump directly to Day 12 inference.
+
 ## 2026-07-15 Fixture-proven training evidence pipeline
 
 Changed:
