@@ -88,20 +88,48 @@ documented the required prerelease dependency flag; saved-state eval
 `407bb371` ran `openai/gpt-4.1-nano` for two examples with zero provider errors,
 and its saved `sim_log` rendered successfully from outside the repository.
 
-**Day 8 — training prep. SMOKE STOPPED AT STEP 0.** Hosted Training's single
-TOML supersedes the obsolete separate orchestrator/trainer/inference files and
-manual small-pod orchestration. The gated smoke is a 50-step T1 LoRA GRPO run
-on `poolside/Laguna-XS-2.1`: batch 128, 8 rollouts/example, 1,024-token
-sampling, and a pre-training plus every-10-step evaluation over all 15 T1 dev
-rows. Laguna was selected to validate the end-to-end pipeline without spending
-project credits while its effective Hosted Training and inference prices remain
-zero. It has 33.4B total parameters and is not yet the final "small model" in
-the headline. Re-check model availability/capacity, effective prices, wallet,
-and Hub quality action immediately before launch; launching requires explicit
-user approval after presenting those values and the exact command. If the
-smoke is healthy and Laguna remains effectively free, Day 10 is provisionally
-300 steps on Laguna. Otherwise stop and re-plan before spending; reduce to 150
-steps if material truncation/reward fixes are needed.
+**Day 8 — free training-pipeline validation. ENVIRONMENT GATE COMPLETE;
+HOSTED TRAINING GATES PENDING.** Hosted Training's single TOML supersedes the
+obsolete separate orchestrator/trainer/inference files and manual small-pod
+orchestration. This phase authorizes only models whose effective training,
+inference-input, and inference-output prices are all $0 immediately before
+launch. A paid model is not a fallback. Any paid experiment requires a later
+PLAN amendment, a stated budget and purpose, and separate explicit approval.
+The inference model used to validate environment plumbing may differ from the
+Hosted Training model, but such runs prove integration only and cannot be used
+as evidence of learning or compared as a before/after pair.
+
+Day 8 has three ordered gates:
+
+1. **Environment/tool-loop gate — COMPLETE.** Saved eval `6d420fc1` ran two T1
+   dev episodes on the free `poolside/laguna-m.1` inference model. It produced
+   valid tool calls and simulator logs, one successful mission (reward 0.9824),
+   one 40-turn TFR loop (reward -1.3), zero provider errors, and zero reported
+   cost. This proves the published environment can execute functional model
+   rollouts. It does not prove that Hosted Training works or that reward rises.
+2. **One-step Hosted Training diagnostic — PENDING.** Use a model in the live
+   Hosted Training catalog that is still effectively free. The current
+   candidate is `sprints/Llama-3.2-1B-Instruct`, subject to a fresh availability,
+   capacity, exact model-ID/client compatibility, pricing, wallet, and Hub
+   quality-action preflight. Keep this diagnostic deliberately small (one
+   training step, batch 16, two rollouts/example, at most four in flight) and
+   use a 20-turn cap to bound the looping behavior observed in the functional
+   eval. Passing requires one real optimizer step, finite metrics, retrievable
+   sampled rollouts, and zero cost.
+3. **Free 50-step T1 smoke — PENDING.** Only after the one-step diagnostic
+   passes, run a 50-step LoRA GRPO smoke on the same free, trainable model.
+   Include a pre-training baseline and evaluation every 10 steps on all 15 T1
+   dev rows, save checkpoints/adapters every 10 steps, and retain enough
+   sampled rollouts to diagnose context length, turn caps, reward collapse,
+   and tool use. No final-eval seed may be used.
+
+Re-check model availability/capacity, effective prices, wallet, and Hub quality
+action immediately before every launch. Present the exact command and expected
+workload before requesting explicit approval. Stop for non-finite rewards,
+repeated provider/context failures, 15 minutes without progress, unexpected
+positive billing, or more than 50% max-turn truncation by step 10. Do not alter
+simulator or reward semantics merely to accommodate a provider/model failure.
+Turn/context controls may be adjusted when rollout evidence justifies them.
 
 Run `ed7ap9lbtm3lpy6pqeav7lrt` completed a finite pre-training baseline, then
 emitted repeated generic `ModelError` failures across training rollout groups.
@@ -110,16 +138,22 @@ tokens, zero checkpoints, zero cost, and an unchanged wallet. The artifact and
 bounded diagnosis are in `assets/training/day8_smoke.json` and
 `docs/DAY8_SMOKE.md`. Day 8 did not pass; do not relaunch the config unchanged.
 
-**Day 9 — smoke-run postmortem + curriculum config.** Fix what the smoke run
-exposed (it will expose things: reward normalization, degenerate rollouts,
-turn caps). Decide curriculum schedule (T1→T2 mix vs mixed-from-start) from
-smoke evidence. Freeze env v0.1.0 for the main run.
-First unblock the generic training-rollout `ModelError`: obtain provider detail
-and run a minimal free diagnostic separating shared inference instability from
-turn/context pressure. No 150- or 300-step run until one healthy training step
-and usable sampled rollouts exist.
-The prepared first diagnostic holds turn/context limits constant while reducing
-the run to one step, batch 16, and four maximum in-flight rollouts; this tests
+If no currently free Hosted Training model can pass the one-step diagnostic,
+record Day 8 as **BLOCKED by the free training platform/catalog** with the run
+IDs and provider evidence. Do not spend credits and do not repeatedly reshape
+the environment to chase infrastructure failures. Day 8 is complete only when
+the free 50-step smoke reaches step 50, produces a final checkpoint/adapter,
+has finite retrievable metrics and reward distributions, exposes useful sampled
+rollouts, uses no final-eval seeds, reports $0 total cost, and reconciles to an
+unchanged project wallet apart from unrelated billing.
+
+**Day 9 — free smoke-run postmortem + curriculum config.** Fix only what the
+completed smoke's evidence shows (reward normalization, degenerate rollouts,
+turn caps, or curriculum difficulty). Decide T1→T2 versus mixed-from-start from
+that evidence and freeze the environment for the main run. No larger run may
+launch until one healthy optimizer step and usable sampled rollouts exist.
+The first Laguna XS diagnostic held turn/context limits constant while reducing
+the run to one step, batch 16, and four maximum in-flight rollouts; it tested
 the leading concurrency/shared-inference hypothesis before changing context.
 Run `hg6jhftohpaognsubyoncy8s` reproduced the step-0 failure after a clean
 baseline and approximately 29 minutes with zero training-token progress.
@@ -128,19 +162,23 @@ policy-inference exception or platform confirmation before another launch.
 The subsequent renderer-client reproduction returned HTTP 404 for the exact
 Hosted model ID, while the live inference catalog listed only the distinct
 zero-cost `poolside/laguna-m.1`. Use the committed two-row Laguna M.1 functional
-eval to verify the environment/tool loop. Laguna M.1 is not in the Hosted
-Training catalog and cannot be substituted into the training TOML; training
-remains blocked on a repaired Laguna XS alias or a separately approved model
-present in both catalogs.
+eval as the completed environment/tool-loop gate. Laguna M.1 is not in the
+Hosted Training catalog and cannot be substituted into the training TOML. The
+next diagnostic therefore uses a separately verified free Hosted Training
+candidate; absence from the ordinary inference catalog is a compatibility risk
+to test, not grounds to switch to a paid model.
 
 ## Phase 3 — the money shots (Days 10–14)
 
-**Day 10 — main training run launches. GATE (fleet decision).** The former
-300-step Laguna plan is suspended after the Day 8 step-0 failure; do not use the
-150-step fallback either until a revised diagnostic reaches a healthy training
-step. Re-plan before spending. When unblocked, monitor and evaluate checkpoints
-on dev seeds every N steps; final-eval seeds remain untouched until the frozen
-evaluation.
+**Day 10 — main free training run launches. GATE (fleet decision).** Size the
+run from the completed 50-step smoke's throughput, truncation, and learning
+evidence; 150 and 300 steps are options, not commitments. The selected model
+must remain effectively free at launch, and the same availability, pricing,
+wallet, quality-action, and explicit-approval gates apply. If Day 8 is blocked,
+do not substitute a paid run: narrow the project claim or defer training until
+a free compatible model is available. When unblocked, monitor and evaluate
+checkpoints on dev seeds every N steps; final-eval seeds remain untouched until
+the frozen evaluation.
 FLEET GATE: T4 unlocks ONLY if the run is launched and healthy by end of day
 AND HACKS.md has ≥3 closed exploits. Otherwise T4 is cut — write one honest
 "future work" paragraph and never look back.
@@ -173,8 +211,11 @@ Reply to every substantive response same-day. Buffer for whatever broke.
   reread it when tempted.
 - **Training run stalls burn calendar** — that's why launch is Day 10, not 12;
   Days 11–13 tasks are deliberately parallelizable with a running job.
-- **PI credit exhaustion** — smoke run sizes the main run; if credits are
-  tight, shrink model context/turns before shrinking the run count evidence.
+- **Free-model catalog volatility** — a $0 listing can disappear, change price,
+  hit capacity, or expose incompatible model IDs across Hosted Training and
+  inference. Re-run the full preflight before every launch. If no free model
+  works, preserve the evidence and mark the gate blocked; paid credits are not
+  an automatic escape hatch.
 - **The 6.5 trap** — Day 7 and Day 13 both include an external cold-viewer
   check. If the 5-second test fails with a real human, fix the artifact, not
   the viewer.
