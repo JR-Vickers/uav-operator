@@ -1,5 +1,61 @@
 # HANDOFF.md
 
+## 2026-07-15 Day 8 Hosted Training preparation: awaiting launch approval
+
+Changed:
+- Replaced the obsolete planned orchestrator/trainer/inference TOMLs and manual
+  pod selection with one Hosted Training config at
+  `configs/day8_laguna_t1_smoke.toml`.
+- Configured a 50-step T1-only RL/GRPO smoke on
+  `poolside/Laguna-XS-2.1`: batch 128, 8 rollouts/example, 96 maximum in flight,
+  learning rate `3e-5`, LoRA alpha 32, 1,024 tokens, temperature 0.7, and
+  thinking disabled. Hosted Training selects infrastructure.
+- Configured a pre-training baseline and evaluation every 10 steps across all
+  15 T1 dev rows, with two rollouts/example, temperature 0, 10-step
+  checkpoints (retain two), and 10-step adapter uploads (retain three).
+- Pinned `max_examples` in the Hosted arguments so public environment `0.1.1`
+  exposes exactly 75 T1 train and 15 T1 dev rows; no environment republish is
+  needed and final-eval rows remain excluded.
+- Added `scripts/capture_day8_training.py` to archive metadata, metrics, reward
+  distributions, sampled rollouts, token usage/cost, truncation, provider
+  errors, checkpoints, logs, pricing, wallet, and Hub status in one JSON
+  artifact.
+- Documented that Laguna is a zero-credit pipeline-validation choice while its
+  effective prices remain zero. At 33.4B total parameters it is not yet the
+  project's final "small model." Day 10 is provisionally 300 Laguna steps if
+  the smoke is healthy and pricing stays zero; otherwise stop and re-plan, or
+  reduce to 150 after material smoke fixes.
+
+Launch gate:
+- No training command has been invoked. Immediately before launch, re-query
+  Laguna availability/capacity and effective prices, the wallet balance, and
+  Hub quality-action status. Abort on unavailability, capacity, non-zero
+  effective price, or a failed quality action.
+- Present `prime --plain train configs/day8_laguna_t1_smoke.toml`, the expected
+  workload and zero-dollar estimate, and current wallet balance to the user.
+  Wait for explicit approval before invoking it, and launch without `--yes`.
+- Monitor baseline and steps 10, 25, and 50. Stop on non-finite rewards,
+  repeated provider/context failures, 15 minutes without progress, positive
+  billing, or greater than 50% max-turn truncation by step 10.
+
+Verified:
+- Prime CLI `0.6.16` accepts the TOML with its current Hosted Training schema;
+  the parsed config preserves the pinned Hub version and all requested values.
+- Ruff passes and all 40 tests pass, including exact TOML assertions, local
+  instantiation of the 75-row T1 train and 15-row T1 dev variants, disjoint
+  train/dev/final-eval seeds, and reporting-summary coverage.
+- `uv build` succeeds for both sdist and wheel; `git diff --check` passes.
+- Live preflight on 2026-07-15: Laguna is available and not at capacity;
+  effective training, inference-input, and inference-output prices are each
+  `$0.00/M` tokens. Personal wallet balance is `$57.9186`. Public Hub version
+  `0.1.1` has quality action `SUCCESS` (job `sf8qph79xpnv6ctn9q34tlsn`).
+- No Hosted Training launch command was invoked during preparation.
+
+Next action:
+- Request explicit launch approval using the live preflight values and exact
+  command. Re-query all volatile gate values if approval is not immediate.
+  Smoke evidence and the Day 9 postmortem belong in a separate later commit.
+
 ## 2026-07-14 Day 7 complete: renderer and public soft launch
 
 Changed:

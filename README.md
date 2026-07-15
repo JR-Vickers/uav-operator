@@ -19,11 +19,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 7 soft launch complete. Public Hub release
-  `jarrett/uav-operator@0.1.1`, five fixed Laguna T3 clips, hero GIF, frozen
-  rollout artifacts, and the offline renderer are verified. Isolated Hub eval
-  `407bb371` completed two `openai/gpt-4.1-nano` rollouts with zero provider
-  errors and renderable saved state.
+- **Status**: Day 8 Hosted Training preparation is at the explicit launch gate.
+  Public Hub release `jarrett/uav-operator@0.1.1`, renderer evidence, the
+  single smoke-run TOML, reporting capture, and local validation are ready; no
+  training run has been launched. Laguna is the zero-credit pipeline-validation
+  model, not yet the final "small model" claimed by the project.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -112,6 +112,54 @@ Notes:
   `--max-attempts N` to cap retries; the default `0` is intentionally unlimited.
   Individual rollouts still have a 420-second timeout so one hung provider
   request cannot block the persistent retry loop.
+
+### Day 8 Hosted Training smoke
+
+Hosted Training now owns orchestration, training, inference, and infrastructure
+selection, so the current workflow uses one config instead of separate
+orchestrator/trainer/inference TOMLs or a manually selected pod. The committed
+smoke config is
+[`configs/day8_laguna_t1_smoke.toml`](configs/day8_laguna_t1_smoke.toml):
+50 RL/GRPO steps on `poolside/Laguna-XS-2.1`, T1 train rows only, and online
+evaluation before training and every 10 steps on all 15 disjoint T1 dev rows.
+The 15 final-eval T1 seeds are never loaded by this config.
+
+Laguna was chosen because its effective Hosted Training and inference prices
+were zero at preparation time. Pricing and capacity are volatile and must be
+queried again immediately before every launch. Laguna has 33.4B total
+parameters, so this smoke validates the pipeline without consuming project
+credits but does not establish the headline's eventual "small model" result.
+No paid-model run is implied by this config.
+
+The launch is deliberately manual and approval-gated. After re-checking
+`prime --plain train models --output json`, `prime --plain wallet --output
+json`, and `prime --plain env status jarrett/uav-operator --output json`, show
+the values and exact command to the budget owner and wait for an explicit yes:
+
+```bash
+prime --plain train configs/day8_laguna_t1_smoke.toml
+```
+
+Do not add `--yes`; the CLI's own confirmation is an additional safeguard, not
+a substitute for approval before invoking the command. Monitor the baseline
+and steps 10, 25, and 50. Stop for non-finite rewards, repeated provider/context
+failures, 15 minutes without progress, any positive billing, or greater than
+50% max-turn truncation by step 10. Lesser truncation and weak learning belong
+in the Day 9 postmortem.
+
+After the run, capture the complete reproducible evidence bundle (run metadata,
+metrics, reward histograms, sampled rollouts, token usage and cost, truncation,
+provider errors, checkpoint IDs, logs, pricing, wallet, and Hub status):
+
+```bash
+uv run python scripts/capture_day8_training.py <run_id> \
+  --output assets/training/day8_smoke.json
+```
+
+Day 10 is provisionally 300 Laguna steps only if this smoke is healthy and its
+effective price remains zero. If the smoke requires material reward/truncation
+fixes, reduce to 150; if pricing changes or the pipeline is unhealthy, stop and
+re-plan before spending any project credits.
 
 ### Offline rollout renderer
 

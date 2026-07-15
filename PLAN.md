@@ -88,10 +88,20 @@ documented the required prerelease dependency flag; saved-state eval
 `407bb371` ran `openai/gpt-4.1-nano` for two examples with zero provider errors,
 and its saved `sim_log` rendered successfully from outside the repository.
 
-**Day 8 — training prep.** prime-rl configs (orchestrator/trainer/inference
-TOMLs) for Qwen3-4B-Instruct LoRA GRPO on a small PI pod; smoke run (50
-steps, T1-only) to shake out reward scaling, context length, turn truncation.
-Budget check against PI credits; pick main-run size accordingly.
+**Day 8 — training prep. PRE-LAUNCH GATE READY.** Hosted Training's single
+TOML supersedes the obsolete separate orchestrator/trainer/inference files and
+manual small-pod orchestration. The gated smoke is a 50-step T1 LoRA GRPO run
+on `poolside/Laguna-XS-2.1`: batch 128, 8 rollouts/example, 1,024-token
+sampling, and a pre-training plus every-10-step evaluation over all 15 T1 dev
+rows. Laguna was selected to validate the end-to-end pipeline without spending
+project credits while its effective Hosted Training and inference prices remain
+zero. It has 33.4B total parameters and is not yet the final "small model" in
+the headline. Re-check model availability/capacity, effective prices, wallet,
+and Hub quality action immediately before launch; launching requires explicit
+user approval after presenting those values and the exact command. If the
+smoke is healthy and Laguna remains effectively free, Day 10 is provisionally
+300 steps on Laguna. Otherwise stop and re-plan before spending; reduce to 150
+steps if material truncation/reward fixes are needed.
 
 **Day 9 — smoke-run postmortem + curriculum config.** Fix what the smoke run
 exposed (it will expose things: reward normalization, degenerate rollouts,
@@ -100,8 +110,11 @@ smoke evidence. Freeze env v0.1.0 for the main run.
 
 ## Phase 3 — the money shots (Days 10–14)
 
-**Day 10 — main training run launches. GATE (fleet decision).** Main GRPO run
-on PI compute; monitor; eval checkpoints on withheld seeds every N steps.
+**Day 10 — main training run launches. GATE (fleet decision).** Provisional
+main run is 300 Laguna steps only if Day 8 is healthy and its effective price
+remains zero; otherwise re-plan before spending, with 150 steps as the smoke-fix
+fallback. Monitor and evaluate checkpoints on dev seeds every N steps; final-
+eval seeds remain untouched until the frozen evaluation.
 FLEET GATE: T4 unlocks ONLY if the run is launched and healthy by end of day
 AND HACKS.md has ≥3 closed exploits. Otherwise T4 is cut — write one honest
 "future work" paragraph and never look back.
