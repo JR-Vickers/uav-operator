@@ -121,6 +121,10 @@ and usable sampled rollouts exist.
 The prepared first diagnostic holds turn/context limits constant while reducing
 the run to one step, batch 16, and four maximum in-flight rollouts; this tests
 the leading concurrency/shared-inference hypothesis before changing context.
+Run `hg6jhftohpaognsubyoncy8s` reproduced the step-0 failure after a clean
+baseline and approximately 29 minutes with zero training-token progress.
+Concurrency alone is rejected. Pause config experiments and obtain the wrapped
+policy-inference exception or platform confirmation before another launch.
 
 ## Phase 3 — the money shots (Days 10–14)
 

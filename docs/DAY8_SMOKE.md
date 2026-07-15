@@ -72,3 +72,32 @@ limits rather than merely retrying. Any launch needs a fresh config review,
 pricing/wallet gate, and explicit approval. The former provisional 300-step
 Laguna run is suspended; even the 150-step fallback is inappropriate until a
 diagnostic reaches at least one healthy training step.
+
+## One-step concurrency diagnostic
+
+Run `hg6jhftohpaognsubyoncy8s` tested the first hypothesis with batch 16 and
+four maximum in-flight rollouts while retaining the original 40-turn and
+1,024-token limits. It also failed at step 0.
+
+- Started at 03:12:53 UTC and published a clean four-rollout baseline at
+  03:15:15 UTC: `avg@2 = -0.1`, zero errors/cancellations/truncation, and
+  completion lengths 812–886.
+- Made no training-step or training-token progress for approximately 29
+  minutes. It was stopped at 03:44:47 UTC under both the repeated-failure and
+  15-minute no-progress rules.
+- The retained log tail contains 200 `ModelError` rollout failures spanning
+  far more groups than the configured 16-rollout batch, consistent with
+  repeated refill/retry attempts.
+- Usage contains only the baseline: 739,505 inference tokens, zero training
+  tokens, and `$0.00`. No sample, distribution, checkpoint, or adapter exists.
+- Wallet remained `$57.9186`; billing row `cwi9xmm4qy5t8x1w561tete8` records
+  `$0.00` for this run.
+
+Evidence is in `assets/training/day8_diagnostic.json`. Lowering concurrency
+from 96 to 4 did not fix the failure, so concurrency alone is rejected. Because
+the clean baseline used the same environment and context limits while training
+produced no token record before its apparent timeout, the leading diagnosis is
+a Hosted Training policy-inference path failure. This remains an inference:
+the platform still exposes only the wrapper `ModelError`. Do not launch another
+config experiment until the underlying exception is available or Prime
+confirms the service condition.

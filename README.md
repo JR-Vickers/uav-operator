@@ -19,11 +19,12 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 8 smoke `ed7ap9lbtm3lpy6pqeav7lrt` was stopped at step 0
-  after repeated training-rollout `ModelError` failures. Its finite baseline
-  and zero-dollar evidence are preserved, but it produced no training step or
-  checkpoint; do not relaunch the config unchanged. Laguna remains a pipeline-
-  validation model, not the final "small model" claimed by the project.
+- **Status**: Both Day 8 Hosted Training runs stopped at step 0. The original
+  smoke (`ed7ap9lbtm3lpy6pqeav7lrt`) and four-concurrent diagnostic
+  (`hg6jhftohpaognsubyoncy8s`) completed finite baselines but produced repeated
+  training-policy `ModelError` failures, zero training tokens, and no
+  checkpoint. Both cost `$0`; further launches are paused pending the
+  underlying platform exception.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -167,12 +168,17 @@ The former provisional 300-step Day 10 run is suspended. Do not select even the
 step and exposes enough rollout evidence to separate provider instability from
 turn/context pressure.
 
-The next reviewed diagnostic is
+The reviewed diagnostic was
 [`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).
-It attempts one step with batch 16 and at most four in-flight rollouts, while
-holding the original 40-turn and 1,024-token limits constant. It is not approved
-implicitly: re-check live pricing/capacity/wallet/Hub state and obtain explicit
-launch confirmation first.
+It attempted one step with batch 16 and at most four in-flight rollouts, while
+holding the original 40-turn and 1,024-token limits constant.
+
+That diagnostic was launched as `hg6jhftohpaognsubyoncy8s` and also failed at
+step 0 after about 29 minutes without training progress. Its clean baseline and
+zero training-token usage reject concurrency alone as the explanation and point
+instead to the Hosted Training policy-inference path. See
+[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md); do not launch another blind config
+variant until the wrapped provider/platform exception is available.
 
 ### Offline rollout renderer
 

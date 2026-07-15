@@ -81,8 +81,23 @@ Diagnostic preparation:
   `git diff --check` passes.
 - Live gate remains healthy: Laguna available/not at capacity with all three
   effective prices `$0.00/M`, wallet `$57.9186`, and Hub action `SUCCESS`.
-- The diagnostic has not been launched. It requires explicit approval after
-  review of `prime --plain train configs/day8_laguna_t1_diagnostic.toml`.
+- The diagnostic was committed and explicitly reviewed before the user
+  launched it; the outcome is recorded below.
+
+Diagnostic outcome:
+- User launched `hg6jhftohpaognsubyoncy8s` after the CLI's free-pricing and Hub
+  checks. Its four-rollout baseline completed cleanly at step 0 with
+  `avg@2 = -0.1`, zero errors/truncation, and 739,505 inference tokens.
+- The run then made no training-token or step progress for about 29 minutes and
+  emitted repeated `ModelError` failures across refill/retry groups. It was
+  stopped at 03:44:47 UTC; no checkpoint, adapter, sample, or distribution
+  exists.
+- `assets/training/day8_diagnostic.json` captures the run. Cost was `$0.00`,
+  wallet stayed `$57.9186`, and its billing row is zero.
+- Reducing concurrency from 96 to 4 did not help. The clean baseline plus zero
+  training-policy tokens makes a Hosted Training policy-inference timeout/path
+  failure the leading diagnosis, though the hidden wrapped exception is needed
+  for confirmation. Pause further config launches until it is exposed.
 
 ## 2026-07-14 Day 7 complete: renderer and public soft launch
 
