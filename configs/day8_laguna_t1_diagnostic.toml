@@ -1,0 +1,42 @@
+name = "uav-operator-day8-laguna-t1-diagnostic"
+model = "poolside/Laguna-XS-2.1"
+loss = "rl"
+max_steps = 1
+
+batch_size = 16
+rollouts_per_example = 2
+max_inflight_rollouts = 4
+learning_rate = 3e-5
+lora_alpha = 32
+
+[sampling]
+max_tokens = 1024
+temperature = 0.7
+enable_thinking = false
+
+[[env]]
+id = "jarrett/uav-operator@0.1.1"
+args = { tier = "T1", dataset_split = "train", max_examples = 8, max_turns = 40 }
+
+[eval]
+interval = 1
+num_examples = 2
+rollouts_per_example = 2
+skip_first_step = false
+
+[[eval.env]]
+id = "jarrett/uav-operator@0.1.1"
+args = { tier = "T1", dataset_split = "dev", max_examples = 2, max_turns = 40 }
+
+[eval.sampling]
+max_tokens = 1024
+temperature = 0.0
+enable_thinking = false
+
+[checkpoints]
+interval = 1
+keep_cloud = 1
+
+[adapters]
+interval = 1
+keep_last = 1

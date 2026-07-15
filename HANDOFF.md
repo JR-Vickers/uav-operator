@@ -47,9 +47,11 @@ Verified:
 
 Next action:
 - Obtain the underlying platform/provider detail for the generic `ModelError`,
-  then design the smallest free diagnostic to distinguish inference instability
-  from turn/context pressure. Any retry requires a revised config, renewed live
-  gate, and explicit approval; the 150- and 300-step runs are suspended.
+  then review and gate `configs/day8_laguna_t1_diagnostic.toml`: one step,
+  batch 16, two rollouts/example, four in flight, eight train rows, and two dev
+  rows. It preserves the 40-turn/1,024-token limits to isolate concurrency.
+  Any retry requires a renewed live gate and explicit approval; the 150- and
+  300-step runs are suspended.
 
 Smoke outcome:
 - User explicitly approved launch. The renewed gate remained healthy: Laguna
@@ -67,6 +69,20 @@ Smoke outcome:
 - Usage: 5,616,940 inference tokens, zero training tokens, `$0.00` total cost.
   Wallet remained `$57.9186`; the new run billing row has amount `$0.00`.
 - Full postmortem: `docs/DAY8_SMOKE.md`. Do not relaunch unchanged.
+
+Diagnostic preparation:
+- Added `configs/day8_laguna_t1_diagnostic.toml`, which changes only workload
+  pressure: one step, batch 16, two rollouts/example, and four maximum in
+  flight. It retains `max_turns = 40`, 1,024-token sampling, model, learning
+  rate, LoRA alpha, environment version, and T1 task.
+- Prime CLI `0.6.16` accepts the diagnostic config. Its eight train and two dev
+  rows instantiate locally and use disjoint seeds; final-eval remains excluded.
+- Ruff passes, all 44 tests pass, both package artifacts build, and
+  `git diff --check` passes.
+- Live gate remains healthy: Laguna available/not at capacity with all three
+  effective prices `$0.00/M`, wallet `$57.9186`, and Hub action `SUCCESS`.
+- The diagnostic has not been launched. It requires explicit approval after
+  review of `prime --plain train configs/day8_laguna_t1_diagnostic.toml`.
 
 ## 2026-07-14 Day 7 complete: renderer and public soft launch
 

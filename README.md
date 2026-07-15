@@ -167,6 +167,13 @@ The former provisional 300-step Day 10 run is suspended. Do not select even the
 step and exposes enough rollout evidence to separate provider instability from
 turn/context pressure.
 
+The next reviewed diagnostic is
+[`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).
+It attempts one step with batch 16 and at most four in-flight rollouts, while
+holding the original 40-turn and 1,024-token limits constant. It is not approved
+implicitly: re-check live pricing/capacity/wallet/Hub state and obtain explicit
+launch confirmation first.
+
 ### Offline rollout renderer
 
 The renderer consumes only a saved JSON object containing frozen-schema

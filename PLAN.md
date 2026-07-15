@@ -118,6 +118,9 @@ First unblock the generic training-rollout `ModelError`: obtain provider detail
 and run a minimal free diagnostic separating shared inference instability from
 turn/context pressure. No 150- or 300-step run until one healthy training step
 and usable sampled rollouts exist.
+The prepared first diagnostic holds turn/context limits constant while reducing
+the run to one step, batch 16, and four maximum in-flight rollouts; this tests
+the leading concurrency/shared-inference hypothesis before changing context.
 
 ## Phase 3 — the money shots (Days 10–14)
 

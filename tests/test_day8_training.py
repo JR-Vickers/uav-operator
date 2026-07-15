@@ -13,10 +13,18 @@ from scripts.capture_day8_training import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "day8_laguna_t1_smoke.toml"
+DIAGNOSTIC_CONFIG_PATH = (
+    REPO_ROOT / "configs" / "day8_laguna_t1_diagnostic.toml"
+)
 
 
 def _config() -> dict[str, object]:
     with CONFIG_PATH.open("rb") as config_file:
+        return tomllib.load(config_file)
+
+
+def _diagnostic_config() -> dict[str, object]:
+    with DIAGNOSTIC_CONFIG_PATH.open("rb") as config_file:
         return tomllib.load(config_file)
 
 
@@ -98,6 +106,75 @@ def test_day8_configured_t1_splits_are_disjoint_and_withhold_final_eval() -> Non
     assert train_seeds.isdisjoint(dev_seeds)
     assert train_seeds.isdisjoint(final_eval_seeds)
     assert dev_seeds.isdisjoint(final_eval_seeds)
+
+
+def test_day8_diagnostic_is_one_step_and_isolates_concurrency() -> None:
+    config = _diagnostic_config()
+
+    assert config["model"] == "poolside/Laguna-XS-2.1"
+    assert config["loss"] == "rl"
+    assert config["max_steps"] == 1
+    assert config["batch_size"] == 16
+    assert config["rollouts_per_example"] == 2
+    assert config["max_inflight_rollouts"] == 4
+    assert config["learning_rate"] == 3e-5
+    assert config["lora_alpha"] == 32
+    assert config["sampling"] == {
+        "max_tokens": 1024,
+        "temperature": 0.7,
+        "enable_thinking": False,
+    }
+    assert config["env"] == [
+        {
+            "id": "jarrett/uav-operator@0.1.1",
+            "args": {
+                "tier": "T1",
+                "dataset_split": "train",
+                "max_examples": 8,
+                "max_turns": 40,
+            },
+        }
+    ]
+    assert config["eval"] == {
+        "interval": 1,
+        "num_examples": 2,
+        "rollouts_per_example": 2,
+        "skip_first_step": False,
+        "env": [
+            {
+                "id": "jarrett/uav-operator@0.1.1",
+                "args": {
+                    "tier": "T1",
+                    "dataset_split": "dev",
+                    "max_examples": 2,
+                    "max_turns": 40,
+                },
+            }
+        ],
+        "sampling": {
+            "max_tokens": 1024,
+            "temperature": 0.0,
+            "enable_thinking": False,
+        },
+    }
+    assert config["checkpoints"] == {"interval": 1, "keep_cloud": 1}
+    assert config["adapters"] == {"interval": 1, "keep_last": 1}
+    assert "infrastructure" not in config
+
+
+def test_day8_diagnostic_uses_only_small_disjoint_train_and_dev_views() -> None:
+    config = _diagnostic_config()
+    train_env = uav_operator.load_environment(**config["env"][0]["args"])
+    dev_env = uav_operator.load_environment(**config["eval"]["env"][0]["args"])
+    train_rows = list(train_env.get_dataset())
+    dev_rows = list(dev_env.get_eval_dataset())
+
+    assert len(train_rows) == 8
+    assert len(dev_rows) == 2
+    assert {row["info"]["tier"] for row in train_rows + dev_rows} == {"T1"}
+    assert {row["info"]["seed"] for row in train_rows}.isdisjoint(
+        row["info"]["seed"] for row in dev_rows
+    )
 
 
 def test_day8_sample_summary_reports_truncation_and_provider_errors() -> None:

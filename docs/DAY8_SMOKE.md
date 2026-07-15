@@ -62,10 +62,13 @@ simulator-state-only environment `jarrett/uav-operator@0.1.1`.
 ## Day 9 decision
 
 Stop and re-plan before any main run. First obtain the underlying `ModelError`
-detail from Prime support/platform telemetry. Then run the smallest possible
-free diagnostic that can separate inference instability from context/turn
-pressure; likely dials include lower `max_turns`, lower sampling length, fewer
-in-flight rollouts, or a single-example rollout probe. Any new launch needs a
-fresh config review, pricing/wallet gate, and explicit approval. The former
-provisional 300-step Laguna run is suspended; even the 150-step fallback is not
-appropriate until a diagnostic reaches at least one healthy training step.
+detail from Prime support/platform telemetry. The first diagnostic is
+`configs/day8_laguna_t1_diagnostic.toml`: one optimizer step, batch 16, two
+rollouts/example, four maximum in flight, eight T1 train rows, and two T1 dev
+rows. It deliberately preserves `max_turns = 40` and 1,024-token sampling so a
+success isolates the original 96-way training burst as the material change. If
+it reproduces `ModelError`, the next diagnostic should reduce turn/context
+limits rather than merely retrying. Any launch needs a fresh config review,
+pricing/wallet gate, and explicit approval. The former provisional 300-step
+Laguna run is suspended; even the 150-step fallback is inappropriate until a
+diagnostic reaches at least one healthy training step.
