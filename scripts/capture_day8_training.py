@@ -104,6 +104,30 @@ def summarize_samples(samples_by_step: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def summarize_logs(logs: str) -> dict[str, int]:
+    """Count explicit platform failure markers without inspecting model prose."""
+
+    return {
+        "model_errors": logs.count("Error: ModelError"),
+        "rollout_failures": logs.count("Rollout failed in group"),
+    }
+
+
+def wallet_evidence(wallet: dict[str, Any], run_id: str) -> dict[str, Any]:
+    """Retain run reconciliation fields without unrelated account history."""
+
+    return {
+        "balance_usd": wallet.get("balance_usd"),
+        "currency": wallet.get("currency"),
+        "total_billings": wallet.get("total_billings"),
+        "run_billings": [
+            row
+            for row in wallet.get("recent_billings", [])
+            if row.get("resource_id") == run_id
+        ],
+    }
+
+
 def _parse_steps(value: str) -> tuple[int, ...]:
     steps = tuple(dict.fromkeys(int(item.strip()) for item in value.split(",")))
     if not steps or any(step < 0 for step in steps):
@@ -137,7 +161,9 @@ def capture(run_id: str, config_path: Path, steps: Sequence[int]) -> dict[str, A
         (item for item in model_catalog.get("models", []) if item.get("name") == MODEL),
         None,
     )
+    wallet = _prime_json(["wallet", "--limit", "100", "--output", "json"])
 
+    logs = _prime_text(["train", "logs", run_id, "--tail", "5000", "--raw"])
     artifact = {
         "schema_version": 1,
         "captured_at": datetime.now(timezone.utc).isoformat(),
@@ -161,11 +187,12 @@ def capture(run_id: str, config_path: Path, steps: Sequence[int]) -> dict[str, A
             ["train", "checkpoints", run_id, "--output", "json"]
         ),
         "model_pricing": selected_model,
-        "wallet": _prime_json(["wallet", "--limit", "100", "--output", "json"]),
+        "wallet": wallet_evidence(wallet, run_id),
         "hub_status": _prime_json(
             ["env", "status", "jarrett/uav-operator", "--output", "json"]
         ),
-        "logs": _prime_text(["train", "logs", run_id, "--tail", "5000", "--raw"]),
+        "log_summary": summarize_logs(logs),
+        "logs": logs,
     }
     return artifact
 

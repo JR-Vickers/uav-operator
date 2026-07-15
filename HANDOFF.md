@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-## 2026-07-15 Day 8 Hosted Training preparation: awaiting launch approval
+## 2026-07-15 Day 8 smoke stopped at step 0
 
 Changed:
 - Replaced the obsolete planned orchestrator/trainer/inference TOMLs and manual
@@ -22,21 +22,15 @@ Changed:
   artifact.
 - Documented that Laguna is a zero-credit pipeline-validation choice while its
   effective prices remain zero. At 33.4B total parameters it is not yet the
-  project's final "small model." Day 10 is provisionally 300 Laguna steps if
-  the smoke is healthy and pricing stays zero; otherwise stop and re-plan, or
-  reduce to 150 after material smoke fixes.
+  project's final "small model." Preparation made Day 10 provisionally 300
+  Laguna steps, but the stopped smoke now suspends that path.
 
-Launch gate:
-- No training command has been invoked. Immediately before launch, re-query
-  Laguna availability/capacity and effective prices, the wallet balance, and
-  Hub quality-action status. Abort on unavailability, capacity, non-zero
-  effective price, or a failed quality action.
-- Present `prime --plain train configs/day8_laguna_t1_smoke.toml`, the expected
-  workload and zero-dollar estimate, and current wallet balance to the user.
-  Wait for explicit approval before invoking it, and launch without `--yes`.
-- Monitor baseline and steps 10, 25, and 50. Stop on non-finite rewards,
-  repeated provider/context failures, 15 minutes without progress, positive
-  billing, or greater than 50% max-turn truncation by step 10.
+Launch protocol satisfied:
+- Preparation invoked no training command. The later launch followed an
+  explicit user confirmation, renewed availability/pricing/wallet/Hub checks,
+  and the CLI's interactive prompt without `--yes`.
+- Monitoring enforced the documented stop rules; repeated `ModelError`
+  failures stopped the run before step 1.
 
 Verified:
 - Prime CLI `0.6.16` accepts the TOML with its current Hosted Training schema;
@@ -49,12 +43,30 @@ Verified:
   effective training, inference-input, and inference-output prices are each
   `$0.00/M` tokens. Personal wallet balance is `$57.9186`. Public Hub version
   `0.1.1` has quality action `SUCCESS` (job `sf8qph79xpnv6ctn9q34tlsn`).
-- No Hosted Training launch command was invoked during preparation.
+- No Hosted Training launch command was invoked during the preparation commit.
 
 Next action:
-- Request explicit launch approval using the live preflight values and exact
-  command. Re-query all volatile gate values if approval is not immediate.
-  Smoke evidence and the Day 9 postmortem belong in a separate later commit.
+- Obtain the underlying platform/provider detail for the generic `ModelError`,
+  then design the smallest free diagnostic to distinguish inference instability
+  from turn/context pressure. Any retry requires a revised config, renewed live
+  gate, and explicit approval; the 150- and 300-step runs are suspended.
+
+Smoke outcome:
+- User explicitly approved launch. The renewed gate remained healthy: Laguna
+  available/not at capacity and free, wallet `$57.9186`, Hub action `SUCCESS`.
+- Launched run `ed7ap9lbtm3lpy6pqeav7lrt` without `--yes`; the CLI displayed
+  and received its own interactive confirmation.
+- Step-0 baseline was finite (`avg@2 = -0.1`) with zero errored/cancelled rows,
+  platform truncation mean `0.0333333`, and all reported turn counts at 40.
+- Training then emitted repeated `ModelError` failures across many rollout
+  groups. Stopped at 02:51:13 UTC under the agreed repeated-failure condition,
+  before step 1. No checkpoint or adapter exists.
+- Captured `assets/training/day8_smoke.json`; its retained log tail includes
+  200 explicit failures. Targeted logs expose no underlying provider detail,
+  so context pressure and shared inference instability remain hypotheses.
+- Usage: 5,616,940 inference tokens, zero training tokens, `$0.00` total cost.
+  Wallet remained `$57.9186`; the new run billing row has amount `$0.00`.
+- Full postmortem: `docs/DAY8_SMOKE.md`. Do not relaunch unchanged.
 
 ## 2026-07-14 Day 7 complete: renderer and public soft launch
 

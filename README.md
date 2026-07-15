@@ -19,11 +19,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Day 8 Hosted Training preparation is at the explicit launch gate.
-  Public Hub release `jarrett/uav-operator@0.1.1`, renderer evidence, the
-  single smoke-run TOML, reporting capture, and local validation are ready; no
-  training run has been launched. Laguna is the zero-credit pipeline-validation
-  model, not yet the final "small model" claimed by the project.
+- **Status**: Day 8 smoke `ed7ap9lbtm3lpy6pqeav7lrt` was stopped at step 0
+  after repeated training-rollout `ModelError` failures. Its finite baseline
+  and zero-dollar evidence are preserved, but it produced no training step or
+  checkpoint; do not relaunch the config unchanged. Laguna remains a pipeline-
+  validation model, not the final "small model" claimed by the project.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -140,6 +140,12 @@ the values and exact command to the budget owner and wait for an explicit yes:
 prime --plain train configs/day8_laguna_t1_smoke.toml
 ```
 
+The first launch of this exact config was stopped after its step-0 baseline
+because training rollouts produced repeated generic `ModelError` failures. The
+full evidence and bounded postmortem are in
+[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md). Do not relaunch it unchanged; any
+diagnostic retry needs a revised config and renewed approval.
+
 Do not add `--yes`; the CLI's own confirmation is an additional safeguard, not
 a substitute for approval before invoking the command. Monitor the baseline
 and steps 10, 25, and 50. Stop for non-finite rewards, repeated provider/context
@@ -156,10 +162,10 @@ uv run python scripts/capture_day8_training.py <run_id> \
   --output assets/training/day8_smoke.json
 ```
 
-Day 10 is provisionally 300 Laguna steps only if this smoke is healthy and its
-effective price remains zero. If the smoke requires material reward/truncation
-fixes, reduce to 150; if pricing changes or the pipeline is unhealthy, stop and
-re-plan before spending any project credits.
+The former provisional 300-step Day 10 run is suspended. Do not select even the
+150-step fallback until a revised free diagnostic reaches a healthy training
+step and exposes enough rollout evidence to separate provider instability from
+turn/context pressure.
 
 ### Offline rollout renderer
 

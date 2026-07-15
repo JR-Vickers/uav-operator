@@ -4,7 +4,11 @@ import tomllib
 from pathlib import Path
 
 import uav_operator
-from scripts.capture_day8_training import summarize_samples
+from scripts.capture_day8_training import (
+    summarize_logs,
+    summarize_samples,
+    wallet_evidence,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -113,3 +117,35 @@ def test_day8_sample_summary_reports_truncation_and_provider_errors() -> None:
     assert summary["max_turn_truncations"] == 1
     assert summary["truncation_rate"] == 1 / 3
     assert summary["provider_errors"] == 1
+
+
+def test_day8_log_summary_counts_platform_model_errors() -> None:
+    logs = "\n".join(
+        [
+            "Rollout failed in group one — Error: ModelError",
+            "Rollout failed in group two — Error: ModelError",
+            "ordinary informational line",
+        ]
+    )
+
+    assert summarize_logs(logs) == {"model_errors": 2, "rollout_failures": 2}
+
+
+def test_day8_wallet_evidence_excludes_unrelated_history() -> None:
+    wallet = {
+        "wallet_id": "private-wallet-id",
+        "balance_usd": 57.9186,
+        "currency": "USD",
+        "total_billings": 8,
+        "recent_billings": [
+            {"resource_id": "this-run", "amount_usd": 0.0},
+            {"resource_id": "unrelated-run", "amount_usd": 1.0},
+        ],
+    }
+
+    assert wallet_evidence(wallet, "this-run") == {
+        "balance_usd": 57.9186,
+        "currency": "USD",
+        "total_billings": 8,
+        "run_billings": [{"resource_id": "this-run", "amount_usd": 0.0}],
+    }
