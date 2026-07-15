@@ -26,6 +26,12 @@ ZERO_PRICE_FIELDS = (
     "effective_inference_input_price_per_mtok",
     "effective_inference_output_price_per_mtok",
 )
+KNOWN_FREE_TIER_DENIALS = {
+    ("sprints/Llama-3.2-1B-Instruct", ENVIRONMENT): (
+        "HTTP 400: Free-tier model 'sprints/Llama-3.2-1B-Instruct': "
+        "'jarrett/uav-operator' does not meet the free-tier environment requirements."
+    )
+}
 
 
 def _prime_json(args: Sequence[str]) -> dict[str, Any]:
@@ -140,6 +146,12 @@ def validate_preflight(artifact: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(action, dict) or action.get("status") != "SUCCESS":
         failures.append("Hub quality action is not SUCCESS")
 
+    eligibility = artifact.get("free_tier_environment_eligibility", {})
+    if eligibility.get("status") != "eligible":
+        failures.append(
+            "free-tier model/environment eligibility is not affirmatively confirmed"
+        )
+
     failures.extend(f"non-finite number at {path}" for path in find_non_finite(artifact))
     return {
         "passed": not failures,
@@ -174,6 +186,32 @@ def preflight(config_path: Path) -> dict[str, Any]:
         if _model_name(item) == model_name
     ]
     wallet = _prime_json(["wallet", "--limit", "20", "--output", "json"])
+    hub_status = _prime_json(["env", "status", ENVIRONMENT, "--output", "json"])
+    eligibility_flag = _find_value(
+        hub_status, {"free_tier_eligible", "freeTierEligible"}
+    )
+    known_denial = KNOWN_FREE_TIER_DENIALS.get((model_name, ENVIRONMENT))
+    if known_denial:
+        eligibility = {
+            "status": "denied",
+            "source": "recorded_run_creation_response",
+            "detail": known_denial,
+        }
+    elif eligibility_flag is True:
+        eligibility = {
+            "status": "eligible",
+            "source": "hub_status",
+            "detail": None,
+        }
+    else:
+        eligibility = {
+            "status": "unverifiable",
+            "source": None,
+            "detail": (
+                "Prime model and environment-status responses expose no free-tier "
+                "eligibility field, and /rft/runs/preview returns HTTP 405."
+            ),
+        }
     artifact = {
         "schema_version": 2,
         "kind": "day8_hosted_training_preflight",
@@ -183,14 +221,13 @@ def preflight(config_path: Path) -> dict[str, Any]:
         "hosted_training_model": hosted_model,
         "inference_catalog_exact_id_present": bool(inference_matches),
         "inference_catalog_exact_matches": inference_matches,
+        "free_tier_environment_eligibility": eligibility,
         "wallet": {
             "balance_usd": wallet.get("balance_usd"),
             "currency": wallet.get("currency"),
             "total_billings": wallet.get("total_billings"),
         },
-        "hub_status": _prime_json(
-            ["env", "status", ENVIRONMENT, "--output", "json"]
-        ),
+        "hub_status": hub_status,
     }
     artifact["summary"] = validate_preflight(artifact)
     return artifact

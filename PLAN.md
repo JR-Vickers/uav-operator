@@ -88,8 +88,8 @@ documented the required prerelease dependency flag; saved-state eval
 `407bb371` ran `openai/gpt-4.1-nano` for two examples with zero provider errors,
 and its saved `sim_log` rendered successfully from outside the repository.
 
-**Day 8 — free training-pipeline validation. ENVIRONMENT GATE COMPLETE;
-HOSTED TRAINING GATES PENDING.** Hosted Training's single TOML supersedes the
+**Day 8 — free training-pipeline validation. BLOCKED BY FREE HOSTED TRAINING
+CATALOG/ELIGIBILITY.** Hosted Training's single TOML supersedes the
 obsolete separate orchestrator/trainer/inference files and manual small-pod
 orchestration. This phase authorizes only models whose effective training,
 inference-input, and inference-output prices are all $0 immediately before
@@ -107,7 +107,7 @@ Day 8 has three ordered gates:
    one 40-turn TFR loop (reward -1.3), zero provider errors, and zero reported
    cost. This proves the published environment can execute functional model
    rollouts. It does not prove that Hosted Training works or that reward rises.
-2. **One-step Hosted Training diagnostic — PENDING.** Use a model in the live
+2. **One-step Hosted Training diagnostic — BLOCKED.** Use a model in the live
    Hosted Training catalog that is still effectively free. The current
    candidate is `sprints/Llama-3.2-1B-Instruct`, subject to a fresh availability,
    capacity, exact model-ID/client compatibility, pricing, wallet, and Hub
@@ -116,7 +116,7 @@ Day 8 has three ordered gates:
    use a 20-turn cap to bound the looping behavior observed in the functional
    eval. Passing requires one real optimizer step, finite metrics, retrievable
    sampled rollouts, and zero cost.
-3. **Free 50-step T1 smoke — PENDING.** Only after the one-step diagnostic
+3. **Free 50-step T1 smoke — NOT LAUNCHED.** Only after the one-step diagnostic
    passes, run a 50-step LoRA GRPO smoke on the same free, trainable model.
    Include a pre-training baseline and evaluation every 10 steps on all 15 T1
    dev rows, save checkpoints/adapters every 10 steps, and retain enough
@@ -146,6 +146,17 @@ the free 50-step smoke reaches step 50, produces a final checkpoint/adapter,
 has finite retrievable metrics and reward distributions, exposes useful sampled
 rollouts, uses no final-eval seeds, reports $0 total cost, and reconciles to an
 unchanged project wallet apart from unrelated billing.
+
+The remaining free candidate, `sprints/Llama-3.2-1B-Instruct`, was rejected
+before run creation with HTTP 400 because `jarrett/uav-operator` does not meet
+an additional free-tier environment requirement. The model remained available
+and exactly `$0/M` for training/input/output, Hub action `0.1.1` remained
+`SUCCESS`, and the wallet remained `$57.9182`; those checks are therefore not
+sufficient to establish promotional eligibility. No run ID or billing row was
+created. The live preview endpoint returned HTTP 405, so preflight now fails
+closed unless eligibility is affirmatively exposed. Evidence and analysis are
+in `assets/training/day8_llama_1b_diagnostic.json` and
+`docs/DAY8_FREE_TRAINING.md`. Do not launch the 50-step smoke.
 
 **Day 9 — free smoke-run postmortem + curriculum config.** Fix only what the
 completed smoke's evidence shows (reward normalization, degenerate rollouts,

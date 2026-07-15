@@ -26,6 +26,12 @@ SMOKE_CONFIG_PATH = REPO_ROOT / "configs" / "day8_llama_1b_t1_smoke.toml"
 FUNCTIONAL_EVAL_CONFIG_PATH = (
     REPO_ROOT / "configs" / "eval" / "day8_laguna_m1_t1_functional.toml"
 )
+LLAMA_PREFLIGHT_PATH = (
+    REPO_ROOT / "assets" / "training" / "day8_llama_1b_preflight.json"
+)
+LLAMA_DIAGNOSTIC_PATH = (
+    REPO_ROOT / "assets" / "training" / "day8_llama_1b_diagnostic.json"
+)
 MODEL = "sprints/Llama-3.2-1B-Instruct"
 
 
@@ -196,6 +202,7 @@ def test_preflight_selects_model_from_toml_and_allows_inference_absence(
         return {
             "latest_version": {"semantic_version": "0.1.1"},
             "action": {"status": "SUCCESS"},
+            "freeTierEligible": True,
         }
 
     monkeypatch.setattr(capture_script, "_prime_json", fake_prime_json)
@@ -219,10 +226,33 @@ def test_preflight_validation_reports_capacity_pricing_wallet_and_hub() -> None:
             "latest_version": {"semantic_version": "0.1.0"},
             "action": {"status": "FAILED"},
         },
+        "free_tier_environment_eligibility": {"status": "denied"},
     }
     summary = validate_preflight(artifact)
     assert summary["passed"] is False
-    assert len(summary["failures"]) == 7
+    assert len(summary["failures"]) == 8
+
+
+def test_preflight_fails_closed_without_free_tier_eligibility() -> None:
+    artifact = {
+        "hosted_training_model": {
+            "at_capacity": False,
+            **{field: 0.0 for field in capture_script.ZERO_PRICE_FIELDS},
+        },
+        "wallet": {"balance_usd": 57.9182},
+        "hub_status": {
+            "latest_version": {"semantic_version": "0.1.1"},
+            "action": {"status": "SUCCESS"},
+        },
+        "free_tier_environment_eligibility": {"status": "unverifiable"},
+    }
+
+    summary = validate_preflight(artifact)
+
+    assert summary["passed"] is False
+    assert summary["failures"] == [
+        "free-tier model/environment eligibility is not affirmatively confirmed"
+    ]
 
 
 def test_recursive_finite_validation_and_capture_summary() -> None:
@@ -314,3 +344,27 @@ def test_wallet_evidence_excludes_unrelated_history() -> None:
         "run_billings": [{"resource_id": "this-run", "amount_usd": 0.0}],
     }
     assert "private-wallet-id" not in json.dumps(evidence)
+
+
+def test_llama_launch_rejection_evidence_is_finite_and_fail_closed() -> None:
+    preflight = json.loads(LLAMA_PREFLIGHT_PATH.read_text())
+    diagnostic = json.loads(LLAMA_DIAGNOSTIC_PATH.read_text())
+
+    assert preflight["free_tier_environment_eligibility"] == {
+        "detail": (
+            "HTTP 400: Free-tier model 'sprints/Llama-3.2-1B-Instruct': "
+            "'jarrett/uav-operator' does not meet the free-tier environment "
+            "requirements."
+        ),
+        "source": "recorded_run_creation_response",
+        "status": "denied",
+    }
+    assert preflight["summary"]["passed"] is False
+    assert diagnostic["run_created"] is False
+    assert diagnostic["run_id"] is None
+    assert diagnostic["outcome"]["optimizer_steps"] == 0
+    assert diagnostic["outcome"]["training_tokens"] == 0
+    assert diagnostic["billing_reconciliation"]["balance_delta_usd"] == 0.0
+    assert diagnostic["billing_reconciliation"]["run_billing_row"] is None
+    assert find_non_finite(preflight) == []
+    assert find_non_finite(diagnostic) == []

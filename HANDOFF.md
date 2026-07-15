@@ -2,6 +2,20 @@
 
 ## 2026-07-15 Free Llama Day 8 gates prepared
 
+Outcome update:
+- The user accepted the CLI confirmation, but the backend returned HTTP 400
+  before creating a run: free-tier model `sprints/Llama-3.2-1B-Instruct`
+  rejected `jarrett/uav-operator` under a separate environment-eligibility
+  rule. No run ID or billing row exists; wallet remains `$57.9182`.
+- The original preflight had a false-positive bug: zero model prices plus Hub
+  action `SUCCESS` do not establish free-tier environment eligibility. The
+  model/status APIs expose no eligibility field and the installed client's
+  preview endpoint returns HTTP 405. Preflight now fails closed and records the
+  known denial.
+- Day 8 is blocked by the free Hosted Training catalog/eligibility policy. The
+  Llama smoke is not authorized. See `docs/DAY8_FREE_TRAINING.md` and
+  `assets/training/day8_llama_1b_diagnostic.json`.
+
 Changed:
 - Preserved both Laguna configs, run artifacts, and `docs/DAY8_SMOKE.md` as
   historical evidence.

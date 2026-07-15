@@ -19,11 +19,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: The environment/tool-loop gate passed. Both historical Laguna XS
-  Hosted runs stopped at step 0 with `$0` cost. A free
-  `sprints/Llama-3.2-1B-Instruct` one-step compatibility gate is prepared but
-  remains unlaunched and approval-gated; the 50-step smoke cannot launch until
-  that diagnostic passes.
+- **Status**: The environment/tool-loop gate passed, but Day 8 Hosted Training
+  is blocked. Both Laguna XS runs stopped at step 0; the free Llama diagnostic
+  was rejected before run creation because this environment does not meet an
+  undisclosed free-tier eligibility rule. All attempts cost `$0`; the 50-step
+  smoke is not authorized.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -143,8 +143,8 @@ uv run python scripts/capture_day8_training.py preflight \
 ```
 
 It records the config text/hash, exact Hosted entry, ordinary inference-catalog
-presence or absence, wallet balance, and Hub quality action, then fails closed
-for capacity, nonzero pricing, missing wallet data, or a failed Hub action.
+presence or absence, wallet balance, Hub quality action, and free-tier
+environment eligibility, then fails closed unless every gate is affirmative.
 Absence of the exact `sprints/...` ID from ordinary inference is evidence, not
 a blocker: the one-step Hosted diagnostic is the compatibility test. Present
 the artifact, final TOML, `16 × 2` workload, wallet, `$0` estimate, and exact
@@ -171,13 +171,15 @@ Hosted Training by itself. Both Laguna Hosted configs and
 [`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md) remain unchanged as historical
 failure evidence.
 
-If the Llama diagnostic completes step 1 with positive training tokens, finite
-metrics, a retrievable rollout, checkpoint/adapter evidence, and zero billing,
-repeat the full preflight and approval gate for the smoke config. Monitor its
-baseline and steps 10, 25, and 50. Stop for non-finite rewards, three repeated
-provider/context failures within five minutes, 15 minutes without progress,
-positive billing, or greater than 50% max-turn truncation by step 10. Flat
-reward improvement is recorded for Day 9 and is not itself a stop condition.
+The Llama diagnostic was rejected with HTTP 400 after confirmation but before
+run creation: `jarrett/uav-operator` did not meet the model's additional
+free-tier environment requirements. Model pricing was still exactly `$0/M`,
+Hub action `0.1.1` was `SUCCESS`, and the wallet remained `$57.9182`; those
+checks are not sufficient to prove promotional eligibility. No run ID,
+training tokens, billing row, checkpoint, or adapter exists. The evidence and
+postmortem are in
+[`docs/DAY8_FREE_TRAINING.md`](docs/DAY8_FREE_TRAINING.md). Do not launch the
+50-step smoke or retry unchanged.
 
 After the run, capture the complete reproducible evidence bundle (run metadata,
 metrics, reward histograms, sampled rollouts, token usage and cost, truncation,

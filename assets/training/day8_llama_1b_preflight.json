@@ -1,0 +1,65 @@
+{
+  "captured_at": "2026-07-15T05:17:32.975737+00:00",
+  "config": {
+    "path": "configs/day8_llama_1b_t1_diagnostic.toml",
+    "sha256": "73b95f157f12b4616ef1be74971a78120ba4f9d8754e4730913716063e6977af",
+    "text": "name = \"uav-operator-day8-llama-1b-t1-diagnostic\"\nmodel = \"sprints/Llama-3.2-1B-Instruct\"\nloss = \"rl\"\nmax_steps = 1\n\nbatch_size = 16\nrollouts_per_example = 2\nmax_inflight_rollouts = 4\nlearning_rate = 3e-5\nlora_alpha = 32\n\n[sampling]\nmax_tokens = 1024\ntemperature = 0.7\nenable_thinking = false\n\n[[env]]\nid = \"jarrett/uav-operator@0.1.1\"\nargs = { tier = \"T1\", dataset_split = \"train\", max_examples = 8, max_turns = 20 }\n\n[eval]\ninterval = 1\nnum_examples = 2\nrollouts_per_example = 2\nskip_first_step = false\n\n[[eval.env]]\nid = \"jarrett/uav-operator@0.1.1\"\nargs = { tier = \"T1\", dataset_split = \"dev\", max_examples = 2, max_turns = 20 }\n\n[eval.sampling]\nmax_tokens = 1024\ntemperature = 0.0\nenable_thinking = false\n\n[checkpoints]\ninterval = 1\nkeep_cloud = 1\n\n[adapters]\ninterval = 1\nkeep_last = 1\n"
+  },
+  "free_tier_environment_eligibility": {
+    "detail": "HTTP 400: Free-tier model 'sprints/Llama-3.2-1B-Instruct': 'jarrett/uav-operator' does not meet the free-tier environment requirements.",
+    "source": "recorded_run_creation_response",
+    "status": "denied"
+  },
+  "hosted_training_model": {
+    "at_capacity": false,
+    "effective_inference_input_price_per_mtok": 0.0,
+    "effective_inference_output_price_per_mtok": 0.0,
+    "effective_training_price_per_mtok": 0.0,
+    "inference_input_price_per_mtok": 0.0,
+    "inference_output_price_per_mtok": 0.0,
+    "list_inference_input_price_per_mtok": 0.0,
+    "list_inference_output_price_per_mtok": 0.0,
+    "list_training_price_per_mtok": 0.0,
+    "name": "sprints/Llama-3.2-1B-Instruct",
+    "promo_label": null,
+    "training_price_per_mtok": 0.0
+  },
+  "hub_status": {
+    "action": {
+      "job_id": "sf8qph79xpnv6ctn9q34tlsn",
+      "status": "SUCCESS"
+    },
+    "description": "A multi-turn UAV operations environment where models manage drone missions under wind, airspace, and failure events.",
+    "id": "vlgkhs623xf3laro4ucuskqo",
+    "latest_version": {
+      "content_hash": "16d54fa94273b9ff78736f6b760daddc5946251e0bd81bfcf71f3eaf7aa48478",
+      "created_at": "2026-07-14T12:18:09.892000",
+      "semantic_version": "0.1.1",
+      "version_id": "vezakfhk1g1zn3o0jkxdtrkz"
+    },
+    "name": "uav-operator",
+    "owner": {
+      "name": "jarrett",
+      "type": "user"
+    },
+    "visibility": "PUBLIC"
+  },
+  "inference_catalog_exact_id_present": false,
+  "inference_catalog_exact_matches": [],
+  "kind": "day8_hosted_training_preflight",
+  "model": "sprints/Llama-3.2-1B-Instruct",
+  "schema_version": 2,
+  "summary": {
+    "failures": [
+      "free-tier model/environment eligibility is not affirmatively confirmed"
+    ],
+    "inference_catalog_exact_id_present": false,
+    "note": "Ordinary inference-catalog absence is recorded but is not a preflight failure; Hosted Training is the compatibility test.",
+    "passed": false
+  },
+  "wallet": {
+    "balance_usd": 57.9182,
+    "currency": "USD",
+    "total_billings": 10
+  }
+}
