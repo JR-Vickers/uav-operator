@@ -1,5 +1,39 @@
 # HANDOFF.md
 
+## 2026-07-15 Fixture-proven training evidence pipeline
+
+Changed:
+
+- Added `scripts/training_evidence.py` with strict `prepare` and `summarize`
+  commands. Preparation uses only read-only Prime metadata and stops checkpoint
+  input at an explicit interactive deployment gate.
+- Froze checkpoint evaluation to all 15 T1 dev seeds with two rollouts each,
+  temperature 0, 1,024 tokens, 20 turns, concurrency four, no retries, and
+  saved simulator state/logs.
+- Added manifest/config hashing, pricing and wallet snapshots, token ceiling,
+  adapter/checkpoint provenance checks, captured-versus-fixture tainting, and
+  the exact manual eval command.
+- Added strict milestone validation, curve-ready summaries, 95% intervals,
+  completion/safety/truncation/turn/token metrics, and aggregate same-seed
+  before/after rankings retaining source row indices.
+- Added `docs/TRAINING_EVIDENCE.md` and updated README/PLAN. Blocked-mode items
+  1–2 are complete; simulator, reward, scenarios, seeds, and training configs
+  remain unchanged.
+
+Evidence status:
+
+- The end-to-end demonstration is synthetic and lives only under ignored
+  `outputs/training-evidence/`. Its summary and plot are marked
+  `synthetic_fixture`; the plot is watermarked `SYNTHETIC FIXTURE — NOT
+  RESULTS`. It is not learning evidence.
+- No training, deployment, paid inference, or external mutation occurred.
+
+Next action:
+
+- Continue blocked-mode item 3: parameterize the future trained-adapter
+  adversarial runner while preserving all Day 6 evidence and state-only reward
+  checks.
+
 ## 2026-07-15 Blocked-mode Phase 3 replan
 
 Current state:
@@ -18,13 +52,11 @@ Current state:
 
 Next actions that do not require training:
 
-1. Build checkpoint evaluation and curve/same-seed comparison tooling using
-   explicitly synthetic fixtures and strict provenance validation.
-2. Parameterize the trained-model red-team runner without changing simulator or
+1. Parameterize the trained-model red-team runner without changing simulator or
    reward behavior.
-3. Draft training-independent writeup sections, README/leaderboard structure,
+2. Draft training-independent writeup sections, README/leaderboard structure,
    and a video rough cut with empty training-evidence slots.
-4. Complete repository/release hygiene and prepare additional baseline configs;
+3. Complete repository/release hygiene and prepare additional baseline configs;
    obtain explicit approval before any nonzero-cost inference run.
 
 Unblock condition:

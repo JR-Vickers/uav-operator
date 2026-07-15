@@ -209,6 +209,28 @@ The former provisional 300-step Day 10 run is suspended. Do not select even the
 step and exposes enough rollout evidence to separate provider instability from
 turn/context pressure.
 
+### Checkpoint evaluation evidence
+
+The training-independent post-checkpoint path is ready in
+[`scripts/training_evidence.py`](scripts/training_evidence.py), with its
+operational and schema runbook in
+[`docs/TRAINING_EVIDENCE.md`](docs/TRAINING_EVIDENCE.md). Once a real Hosted
+run produces a deployed adapter, prepare each step using its run ID, base model,
+step, and adapter ID. The command verifies read-only Prime provenance,
+deployment readiness, pricing, and wallet state, then emits a frozen 30-rollout
+T1 dev config and the exact manual eval command under ignored
+`outputs/training-evidence/`.
+
+Checkpoint IDs stop at an interactive deployment gate (`prime deployments
+create --checkpoint-id ...`); the script never deploys or evaluates
+automatically.
+After manually capturing step 0 and every requested milestone, `summarize`
+validates seed isolation, logs, finite metrics, provider errors, and manifest
+hashes before producing a curve-ready JSON, reward plot, and ranked same-seed
+before/after candidates. Synthetic plumbing uses fixture provenance and a
+watermarked plot; captured mode rejects it. No synthetic fixture is a project
+result.
+
 The historical Laguna diagnostic was
 [`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).
 It attempted one step with batch 16 and at most four in-flight rollouts, while

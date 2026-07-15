@@ -199,12 +199,14 @@ project result, chart, leaderboard, or learning claim.
 
 Work authorized in parallel:
 
-1. Build a checkpoint-evaluation command that accepts a real adapter/checkpoint
-   identifier, evaluates the frozen dev split, preserves seed provenance, and
-   emits machine-readable results suitable for curve generation.
-2. Build curve, milestone-comparison, and same-seed before/after tooling against
-   explicitly synthetic fixtures, with finite-number, missing-step, provider-
-   error, and seed-isolation validation. Populate it only with captured runs.
+1. **COMPLETE.** Build a checkpoint-evaluation command that accepts a real
+   adapter/checkpoint identifier, evaluates the frozen dev split, preserves
+   seed provenance, and emits machine-readable results suitable for curve
+   generation.
+2. **COMPLETE.** Build curve, milestone-comparison, and same-seed before/after
+   tooling against explicitly synthetic fixtures, with finite-number,
+   missing-step, provider-error, and seed-isolation validation. Populate it
+   only with captured runs.
 3. Parameterize the Day 12 adversarial runner for a future trained adapter while
    preserving all Day 6 evidence and state-only reward checks.
 4. Draft the writeup sections that do not depend on training: the layer model,
