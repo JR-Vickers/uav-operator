@@ -15,4 +15,4 @@ disable_tui = true
 verbose = true
 
 [[eval]]
-id = "jarrett/uav-operator@0.1.1"
+id = "uav-operator"

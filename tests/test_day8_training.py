@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 
 import uav_operator
+import verifiers as vf
 from verifiers.utils.eval_utils import load_toml_config
 from scripts.capture_day8_training import (
     summarize_logs,
@@ -191,7 +192,7 @@ def test_day8_laguna_m1_functional_eval_is_exact_and_renderable() -> None:
     config = _functional_eval_config()
 
     assert config == {
-        "env_id": "jarrett/uav-operator@0.1.1",
+        "env_id": "uav-operator",
         "model": "poolside/laguna-m.1",
         "provider": "prime",
         "api_client_type": "openai_chat_completions",
@@ -213,7 +214,7 @@ def test_day8_laguna_m1_functional_eval_is_exact_and_renderable() -> None:
         "verbose": True,
     }
 
-    env = uav_operator.load_environment(**config["env_args"])
+    env = vf.load_environment(config["env_id"], **config["env_args"])
     rows = list(env.get_eval_dataset())
     final_eval_rows = list(
         uav_operator.load_environment(

@@ -113,6 +113,10 @@ Root-cause follow-up:
 - Fixed the functional eval to use Verifiers' required `[[eval]]` array-table
   shape and added a regression test through `load_toml_config`; the initial
   top-level-only shape was rejected before inference and ran no rollout.
+- Fixed the local eval environment ID from the Hosted-only Hub coordinate
+  `jarrett/uav-operator@0.1.1` to the importable package ID `uav-operator`.
+  The regression now loads it through `vf.load_environment`, matching the
+  command's real import path.
 - This eval can prove that the environment/tool loop functions, but training
   remains blocked until Prime repairs the Laguna XS model alias or a paid model
   present in both catalogs receives explicit budget approval.
