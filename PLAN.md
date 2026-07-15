@@ -125,6 +125,13 @@ Run `hg6jhftohpaognsubyoncy8s` reproduced the step-0 failure after a clean
 baseline and approximately 29 minutes with zero training-token progress.
 Concurrency alone is rejected. Pause config experiments and obtain the wrapped
 policy-inference exception or platform confirmation before another launch.
+The subsequent renderer-client reproduction returned HTTP 404 for the exact
+Hosted model ID, while the live inference catalog listed only the distinct
+zero-cost `poolside/laguna-m.1`. Use the committed two-row Laguna M.1 functional
+eval to verify the environment/tool loop. Laguna M.1 is not in the Hosted
+Training catalog and cannot be substituted into the training TOML; training
+remains blocked on a repaired Laguna XS alias or a separately approved model
+present in both catalogs.
 
 ## Phase 3 — the money shots (Days 10–14)
 

@@ -99,6 +99,21 @@ Diagnostic outcome:
   failure the leading diagnosis, though the hidden wrapped exception is needed
   for confirmation. Pause further config launches until it is exposed.
 
+Root-cause follow-up:
+- A one-row local eval using the RL `renderer` client failed before rollout
+  with HTTP 404: Prime Inference does not expose
+  `poolside/Laguna-XS-2.1`, despite Hosted Training advertising that ID.
+- The live inference catalog exposes only `poolside/laguna-m.1` for Laguna;
+  its input/output price is `$0/M`. The live Hosted Training catalog does not
+  include Laguna M.1, so it cannot be used as a Hosted Training base model.
+- Added `configs/eval/day8_laguna_m1_t1_functional.toml` with the exact M.1 ID,
+  two T1 dev rows, one rollout each, serialized sim state/logs, and the standard
+  chat-completions client proven by prior Laguna evaluations. The manual command
+  is `prime eval run configs/eval/day8_laguna_m1_t1_functional.toml`.
+- This eval can prove that the environment/tool loop functions, but training
+  remains blocked until Prime repairs the Laguna XS model alias or a paid model
+  present in both catalogs receives explicit budget approval.
+
 ## 2026-07-14 Day 7 complete: renderer and public soft launch
 
 Changed:

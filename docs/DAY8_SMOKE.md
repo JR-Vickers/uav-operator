@@ -101,3 +101,39 @@ a Hosted Training policy-inference path failure. This remains an inference:
 the platform still exposes only the wrapper `ModelError`. Do not launch another
 config experiment until the underlying exception is available or Prime
 confirms the service condition.
+
+## Model-catalog diagnosis and functional check
+
+The policy-inference failure is now bounded to a model-catalog mismatch rather
+than the UAV environment:
+
+- `prime train models --output json` advertises and accepts
+  `poolside/Laguna-XS-2.1` for Hosted Training.
+- Prime Inference returns HTTP 404 for that exact ID: `Model
+  'poolside/Laguna-XS-2.1' not found or unavailable`.
+- `prime inference models --output json --search Laguna` lists only
+  `poolside/laguna-m.1` at zero input and output cost.
+- Prime's token-preserving training renderer registry keys Laguna XS.2 by the
+  different exact ID `poolside/Laguna-XS.2`. Hosted Training exposes neither
+  that canonical ID nor a user-facing renderer override.
+
+This explains why changing rollout concurrency did not help: the failing
+training policy path cannot resolve the advertised model consistently. It also
+explains why the base-model evaluation is not sufficient proof of a healthy
+training path; eval and RL training use different inference clients.
+
+`configs/eval/day8_laguna_m1_t1_functional.toml` uses the exact live inference
+ID `poolside/laguna-m.1` and the standard chat-completions client already proven
+by the Day 6/7 Laguna rollouts. It is a two-row T1 dev check with saved
+`sim_state` and `sim_log`, so success means the model actually called tools and
+the resulting rollout remains renderable. Run it manually with:
+
+```bash
+prime eval run configs/eval/day8_laguna_m1_t1_functional.toml
+```
+
+This command is an inference evaluation, not training. `poolside/laguna-m.1`
+is absent from the live Hosted Training catalog and therefore cannot replace
+the base model in a Hosted Training TOML. A functioning Hosted Training run
+requires Prime to repair the Laguna XS alias or a separately approved model
+that appears in both catalogs.

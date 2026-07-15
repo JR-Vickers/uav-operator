@@ -16,6 +16,9 @@ CONFIG_PATH = REPO_ROOT / "configs" / "day8_laguna_t1_smoke.toml"
 DIAGNOSTIC_CONFIG_PATH = (
     REPO_ROOT / "configs" / "day8_laguna_t1_diagnostic.toml"
 )
+FUNCTIONAL_EVAL_CONFIG_PATH = (
+    REPO_ROOT / "configs" / "eval" / "day8_laguna_m1_t1_functional.toml"
+)
 
 
 def _config() -> dict[str, object]:
@@ -25,6 +28,11 @@ def _config() -> dict[str, object]:
 
 def _diagnostic_config() -> dict[str, object]:
     with DIAGNOSTIC_CONFIG_PATH.open("rb") as config_file:
+        return tomllib.load(config_file)
+
+
+def _functional_eval_config() -> dict[str, object]:
+    with FUNCTIONAL_EVAL_CONFIG_PATH.open("rb") as config_file:
         return tomllib.load(config_file)
 
 
@@ -174,6 +182,46 @@ def test_day8_diagnostic_uses_only_small_disjoint_train_and_dev_views() -> None:
     assert {row["info"]["tier"] for row in train_rows + dev_rows} == {"T1"}
     assert {row["info"]["seed"] for row in train_rows}.isdisjoint(
         row["info"]["seed"] for row in dev_rows
+    )
+
+
+def test_day8_laguna_m1_functional_eval_is_exact_and_renderable() -> None:
+    config = _functional_eval_config()
+
+    assert config == {
+        "env_id": "jarrett/uav-operator@0.1.1",
+        "model": "poolside/laguna-m.1",
+        "provider": "prime",
+        "api_client_type": "openai_chat_completions",
+        "env_args": {
+            "tier": "T1",
+            "dataset_split": "dev",
+            "max_examples": 2,
+            "max_turns": 40,
+        },
+        "num_examples": 2,
+        "rollouts_per_example": 1,
+        "max_concurrent": 1,
+        "max_retries": 0,
+        "max_tokens": 512,
+        "temperature": 0.2,
+        "state_columns": ["sim_state", "sim_log"],
+        "save_results": True,
+        "disable_tui": True,
+        "verbose": True,
+    }
+
+    env = uav_operator.load_environment(**config["env_args"])
+    rows = list(env.get_eval_dataset())
+    final_eval_rows = list(
+        uav_operator.load_environment(
+            tier="T1", dataset_split="eval", max_examples=15, max_turns=40
+        ).get_eval_dataset()
+    )
+    assert len(rows) == 2
+    assert {row["info"]["tier"] for row in rows} == {"T1"}
+    assert {row["info"]["seed"] for row in rows}.isdisjoint(
+        row["info"]["seed"] for row in final_eval_rows
     )
 
 

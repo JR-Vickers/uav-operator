@@ -147,6 +147,20 @@ full evidence and bounded postmortem are in
 [`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md). Do not relaunch it unchanged; any
 diagnostic retry needs a revised config and renewed approval.
 
+Troubleshooting isolated a live catalog mismatch: Hosted Training advertises
+`poolside/Laguna-XS-2.1`, but Prime Inference returns 404 for that ID and lists
+only the zero-cost `poolside/laguna-m.1`. The latter is inference-only, so the
+committed functional check is deliberately an eval rather than an invalid
+training config:
+
+```bash
+prime eval run configs/eval/day8_laguna_m1_t1_functional.toml
+```
+
+It saves simulator state and logs for two T1 dev rows. A successful result
+proves end-to-end tool use and offline renderability, but does not unblock
+Hosted Training by itself.
+
 Do not add `--yes`; the CLI's own confirmation is an additional safeguard, not
 a substitute for approval before invoking the command. Monitor the baseline
 and steps 10, 25, and 50. Stop for non-finite rewards, repeated provider/context
