@@ -19,12 +19,11 @@ the model's prose.
   physics-derived rewards and tool-based operator decisions.
 - **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
   `eval`
-- **Status**: Both Day 8 Hosted Training runs stopped at step 0. The original
-  smoke (`ed7ap9lbtm3lpy6pqeav7lrt`) and four-concurrent diagnostic
-  (`hg6jhftohpaognsubyoncy8s`) completed finite baselines but produced repeated
-  training-policy `ModelError` failures, zero training tokens, and no
-  checkpoint. Both cost `$0`; further launches are paused pending the
-  underlying platform exception.
+- **Status**: The environment/tool-loop gate passed. Both historical Laguna XS
+  Hosted runs stopped at step 0 with `$0` cost. A free
+  `sprints/Llama-3.2-1B-Instruct` one-step compatibility gate is prepared but
+  remains unlaunched and approval-gated; the 50-step smoke cannot launch until
+  that diagnostic passes.
 
 ### Datasets
 - **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
@@ -118,34 +117,43 @@ Notes:
 
 Hosted Training now owns orchestration, training, inference, and infrastructure
 selection, so the current workflow uses one config instead of separate
-orchestrator/trainer/inference TOMLs or a manually selected pod. The committed
-smoke config is
-[`configs/day8_laguna_t1_smoke.toml`](configs/day8_laguna_t1_smoke.toml):
-50 RL/GRPO steps on `poolside/Laguna-XS-2.1`, T1 train rows only, and online
-evaluation before training and every 10 steps on all 15 disjoint T1 dev rows.
-The 15 final-eval T1 seeds are never loaded by this config.
+orchestrator/trainer/inference TOMLs or a manually selected pod. The next
+ordered gate is
+[`configs/day8_llama_1b_t1_diagnostic.toml`](configs/day8_llama_1b_t1_diagnostic.toml):
+one optimizer step on `sprints/Llama-3.2-1B-Instruct`, with batch 16, two
+rollouts/example, at most four in flight, eight T1 train rows, two T1 dev rows,
+and a 20-turn cap. Only if it passes may
+[`configs/day8_llama_1b_t1_smoke.toml`](configs/day8_llama_1b_t1_smoke.toml)
+run 50 steps with the same workload controls, all 75 T1 train rows, and
+baseline/every-10-step evaluation over all 15 disjoint T1 dev rows. Neither
+config loads final-eval seeds.
 
-Laguna was chosen because its effective Hosted Training and inference prices
-were zero at preparation time. Pricing and capacity are volatile and must be
-queried again immediately before every launch. Laguna has 33.4B total
-parameters, so this smoke validates the pipeline without consuming project
-credits but does not establish the headline's eventual "small model" result.
-No paid-model run is implied by this config.
+Pricing and capacity are volatile. The exact Hosted model entry must remain
+available, below capacity, and exactly `$0/M` for training, inference input,
+and inference output immediately before each launch. A paid model is not a
+fallback. Llama 3.2 1B is a legitimate small open-model pipeline candidate,
+but a successful smoke alone would not prove that it learned the task.
 
-The launch is deliberately manual and approval-gated. After re-checking
-`prime --plain train models --output json`, `prime --plain wallet --output
-json`, and `prime --plain env status jarrett/uav-operator --output json`, show
-the values and exact command to the budget owner and wait for an explicit yes:
+Generate a reproducible preflight immediately before the diagnostic:
 
 ```bash
-prime --plain train configs/day8_laguna_t1_smoke.toml
+uv run python scripts/capture_day8_training.py preflight \
+  --config configs/day8_llama_1b_t1_diagnostic.toml \
+  --output assets/training/day8_llama_1b_preflight.json
 ```
 
-The first launch of this exact config was stopped after its step-0 baseline
-because training rollouts produced repeated generic `ModelError` failures. The
-full evidence and bounded postmortem are in
-[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md). Do not relaunch it unchanged; any
-diagnostic retry needs a revised config and renewed approval.
+It records the config text/hash, exact Hosted entry, ordinary inference-catalog
+presence or absence, wallet balance, and Hub quality action, then fails closed
+for capacity, nonzero pricing, missing wallet data, or a failed Hub action.
+Absence of the exact `sprints/...` ID from ordinary inference is evidence, not
+a blocker: the one-step Hosted diagnostic is the compatibility test. Present
+the artifact, final TOML, `16 × 2` workload, wallet, `$0` estimate, and exact
+command, then wait for explicit approval. The agent does not invoke training;
+the user launches manually without `--yes`:
+
+```bash
+prime --plain train configs/day8_llama_1b_t1_diagnostic.toml
+```
 
 Troubleshooting isolated a live catalog mismatch: Hosted Training advertises
 `poolside/Laguna-XS-2.1`, but Prime Inference returns 404 for that ID and lists
@@ -157,32 +165,43 @@ training config:
 prime eval run configs/eval/day8_laguna_m1_t1_functional.toml
 ```
 
-It saves simulator state and logs for two T1 dev rows. A successful result
-proves end-to-end tool use and offline renderability, but does not unblock
-Hosted Training by itself.
+It saves simulator state and logs for two T1 dev rows. Its successful result
+proved end-to-end tool use and offline renderability, but did not unblock
+Hosted Training by itself. Both Laguna Hosted configs and
+[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md) remain unchanged as historical
+failure evidence.
 
-Do not add `--yes`; the CLI's own confirmation is an additional safeguard, not
-a substitute for approval before invoking the command. Monitor the baseline
-and steps 10, 25, and 50. Stop for non-finite rewards, repeated provider/context
-failures, 15 minutes without progress, any positive billing, or greater than
-50% max-turn truncation by step 10. Lesser truncation and weak learning belong
-in the Day 9 postmortem.
+If the Llama diagnostic completes step 1 with positive training tokens, finite
+metrics, a retrievable rollout, checkpoint/adapter evidence, and zero billing,
+repeat the full preflight and approval gate for the smoke config. Monitor its
+baseline and steps 10, 25, and 50. Stop for non-finite rewards, three repeated
+provider/context failures within five minutes, 15 minutes without progress,
+positive billing, or greater than 50% max-turn truncation by step 10. Flat
+reward improvement is recorded for Day 9 and is not itself a stop condition.
 
 After the run, capture the complete reproducible evidence bundle (run metadata,
 metrics, reward histograms, sampled rollouts, token usage and cost, truncation,
 provider errors, checkpoint IDs, logs, pricing, wallet, and Hub status):
 
 ```bash
-uv run python scripts/capture_day8_training.py <run_id> \
-  --output assets/training/day8_smoke.json
+uv run python scripts/capture_day8_training.py capture <run_id> \
+  --config configs/day8_llama_1b_t1_diagnostic.toml \
+  --preflight assets/training/day8_llama_1b_preflight.json \
+  --steps 0,1 \
+  --output assets/training/day8_llama_1b_diagnostic.json
 ```
+
+The capture validates finite numbers recursively, reconciles run billing with
+the preflight wallet snapshot without retaining unrelated wallet history, and
+reports truncation, provider errors, milestone coverage, checkpoints, and
+adapter-upload evidence.
 
 The former provisional 300-step Day 10 run is suspended. Do not select even the
 150-step fallback until a revised free diagnostic reaches a healthy training
 step and exposes enough rollout evidence to separate provider instability from
 turn/context pressure.
 
-The reviewed diagnostic was
+The historical Laguna diagnostic was
 [`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).
 It attempted one step with batch 16 and at most four in-flight rollouts, while
 holding the original 40-turn and 1,024-token limits constant.

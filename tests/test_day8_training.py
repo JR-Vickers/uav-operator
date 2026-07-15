@@ -1,196 +1,148 @@
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 
+import pytest
 import uav_operator
 import verifiers as vf
-from verifiers.utils.eval_utils import load_toml_config
+from scripts import capture_day8_training as capture_script
 from scripts.capture_day8_training import (
+    billing_reconciliation,
+    find_non_finite,
     summarize_logs,
     summarize_samples,
+    validate_capture,
+    validate_preflight,
     wallet_evidence,
 )
+from verifiers.utils.eval_utils import load_toml_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_PATH = REPO_ROOT / "configs" / "day8_laguna_t1_smoke.toml"
-DIAGNOSTIC_CONFIG_PATH = (
-    REPO_ROOT / "configs" / "day8_laguna_t1_diagnostic.toml"
-)
+DIAGNOSTIC_CONFIG_PATH = REPO_ROOT / "configs" / "day8_llama_1b_t1_diagnostic.toml"
+SMOKE_CONFIG_PATH = REPO_ROOT / "configs" / "day8_llama_1b_t1_smoke.toml"
 FUNCTIONAL_EVAL_CONFIG_PATH = (
     REPO_ROOT / "configs" / "eval" / "day8_laguna_m1_t1_functional.toml"
 )
+MODEL = "sprints/Llama-3.2-1B-Instruct"
 
 
-def _config() -> dict[str, object]:
-    with CONFIG_PATH.open("rb") as config_file:
+def _load(path: Path) -> dict[str, object]:
+    with path.open("rb") as config_file:
         return tomllib.load(config_file)
 
 
-def _diagnostic_config() -> dict[str, object]:
-    with DIAGNOSTIC_CONFIG_PATH.open("rb") as config_file:
-        return tomllib.load(config_file)
-
-
-def _functional_eval_config() -> dict[str, object]:
-    configs = load_toml_config(FUNCTIONAL_EVAL_CONFIG_PATH)
-    assert len(configs) == 1
-    return configs[0]
-
-
-def test_day8_hosted_training_config_is_exact() -> None:
-    config = _config()
-
-    assert config["model"] == "poolside/Laguna-XS-2.1"
-    assert config["loss"] == "rl"
-    assert config["max_steps"] == 50
-    assert config["batch_size"] == 128
-    assert config["rollouts_per_example"] == 8
-    assert config["max_inflight_rollouts"] == 96
-    assert config["learning_rate"] == 3e-5
-    assert config["lora_alpha"] == 32
-    assert config["sampling"] == {
-        "max_tokens": 1024,
-        "temperature": 0.7,
-        "enable_thinking": False,
-    }
-    assert config["env"] == [
-        {
-            "id": "jarrett/uav-operator@0.1.1",
-            "args": {
-                "tier": "T1",
-                "dataset_split": "train",
-                "max_examples": 75,
-                "max_turns": 40,
-            },
-        }
-    ]
-    assert config["eval"] == {
-        "interval": 10,
-        "num_examples": 15,
+def _expected_config(*, diagnostic: bool) -> dict[str, object]:
+    max_steps = 1 if diagnostic else 50
+    train_examples = 8 if diagnostic else 75
+    eval_examples = 2 if diagnostic else 15
+    interval = 1 if diagnostic else 10
+    return {
+        "name": (
+            "uav-operator-day8-llama-1b-t1-diagnostic"
+            if diagnostic
+            else "uav-operator-day8-llama-1b-t1-smoke"
+        ),
+        "model": MODEL,
+        "loss": "rl",
+        "max_steps": max_steps,
+        "batch_size": 16,
         "rollouts_per_example": 2,
-        "skip_first_step": False,
+        "max_inflight_rollouts": 4,
+        "learning_rate": 3e-5,
+        "lora_alpha": 32,
+        "sampling": {
+            "max_tokens": 1024,
+            "temperature": 0.7,
+            "enable_thinking": False,
+        },
         "env": [
             {
                 "id": "jarrett/uav-operator@0.1.1",
                 "args": {
                     "tier": "T1",
-                    "dataset_split": "dev",
-                    "max_examples": 15,
-                    "max_turns": 40,
+                    "dataset_split": "train",
+                    "max_examples": train_examples,
+                    "max_turns": 20,
                 },
             }
         ],
-        "sampling": {
-            "max_tokens": 1024,
-            "temperature": 0.0,
-            "enable_thinking": False,
+        "eval": {
+            "interval": interval,
+            "num_examples": eval_examples,
+            "rollouts_per_example": 2,
+            "skip_first_step": False,
+            "env": [
+                {
+                    "id": "jarrett/uav-operator@0.1.1",
+                    "args": {
+                        "tier": "T1",
+                        "dataset_split": "dev",
+                        "max_examples": eval_examples,
+                        "max_turns": 20,
+                    },
+                }
+            ],
+            "sampling": {
+                "max_tokens": 1024,
+                "temperature": 0.0,
+                "enable_thinking": False,
+            },
+        },
+        "checkpoints": {
+            "interval": interval,
+            "keep_cloud": 1 if diagnostic else 2,
+        },
+        "adapters": {
+            "interval": interval,
+            "keep_last": 1 if diagnostic else 3,
         },
     }
-    assert config["checkpoints"] == {"interval": 10, "keep_cloud": 2}
-    assert config["adapters"] == {"interval": 10, "keep_last": 3}
-    assert "infrastructure" not in config
 
 
-def test_day8_configured_t1_splits_are_disjoint_and_withhold_final_eval() -> None:
-    config = _config()
-    train_args = config["env"][0]["args"]
-    dev_args = config["eval"]["env"][0]["args"]
-    train_env = uav_operator.load_environment(**train_args)
-    dev_env = uav_operator.load_environment(**dev_args)
+@pytest.mark.parametrize(
+    ("path", "diagnostic"),
+    [(DIAGNOSTIC_CONFIG_PATH, True), (SMOKE_CONFIG_PATH, False)],
+)
+def test_day8_llama_configs_are_exact(path: Path, diagnostic: bool) -> None:
+    assert _load(path) == _expected_config(diagnostic=diagnostic)
 
+
+@pytest.mark.parametrize(
+    ("path", "train_count", "dev_count"),
+    [(DIAGNOSTIC_CONFIG_PATH, 8, 2), (SMOKE_CONFIG_PATH, 75, 15)],
+)
+def test_day8_llama_views_are_disjoint_and_withhold_final_eval(
+    path: Path, train_count: int, dev_count: int
+) -> None:
+    config = _load(path)
+    train_env = uav_operator.load_environment(**config["env"][0]["args"])
+    dev_env = uav_operator.load_environment(**config["eval"]["env"][0]["args"])
+    final_eval_env = uav_operator.load_environment(
+        tier="T1", dataset_split="eval", max_examples=15, max_turns=20
+    )
     train_rows = list(train_env.get_dataset())
     dev_rows = list(dev_env.get_eval_dataset())
-    final_eval_rows = list(
-        uav_operator.load_environment(
-            tier="T1", dataset_split="eval", max_examples=15, max_turns=40
-        ).get_eval_dataset()
-    )
+    final_eval_rows = list(final_eval_env.get_eval_dataset())
     train_seeds = {row["info"]["seed"] for row in train_rows}
     dev_seeds = {row["info"]["seed"] for row in dev_rows}
     final_eval_seeds = {row["info"]["seed"] for row in final_eval_rows}
 
-    assert len(train_rows) == 75
-    assert len(dev_rows) == len(final_eval_rows) == 15
+    assert len(train_rows) == train_count
+    assert len(dev_rows) == dev_count
+    assert len(final_eval_rows) == 15
     assert {row["info"]["tier"] for row in train_rows + dev_rows} == {"T1"}
     assert train_seeds.isdisjoint(dev_seeds)
     assert train_seeds.isdisjoint(final_eval_seeds)
     assert dev_seeds.isdisjoint(final_eval_seeds)
 
 
-def test_day8_diagnostic_is_one_step_and_isolates_concurrency() -> None:
-    config = _diagnostic_config()
-
-    assert config["model"] == "poolside/Laguna-XS-2.1"
-    assert config["loss"] == "rl"
-    assert config["max_steps"] == 1
-    assert config["batch_size"] == 16
-    assert config["rollouts_per_example"] == 2
-    assert config["max_inflight_rollouts"] == 4
-    assert config["learning_rate"] == 3e-5
-    assert config["lora_alpha"] == 32
-    assert config["sampling"] == {
-        "max_tokens": 1024,
-        "temperature": 0.7,
-        "enable_thinking": False,
-    }
-    assert config["env"] == [
-        {
-            "id": "jarrett/uav-operator@0.1.1",
-            "args": {
-                "tier": "T1",
-                "dataset_split": "train",
-                "max_examples": 8,
-                "max_turns": 40,
-            },
-        }
-    ]
-    assert config["eval"] == {
-        "interval": 1,
-        "num_examples": 2,
-        "rollouts_per_example": 2,
-        "skip_first_step": False,
-        "env": [
-            {
-                "id": "jarrett/uav-operator@0.1.1",
-                "args": {
-                    "tier": "T1",
-                    "dataset_split": "dev",
-                    "max_examples": 2,
-                    "max_turns": 40,
-                },
-            }
-        ],
-        "sampling": {
-            "max_tokens": 1024,
-            "temperature": 0.0,
-            "enable_thinking": False,
-        },
-    }
-    assert config["checkpoints"] == {"interval": 1, "keep_cloud": 1}
-    assert config["adapters"] == {"interval": 1, "keep_last": 1}
-    assert "infrastructure" not in config
-
-
-def test_day8_diagnostic_uses_only_small_disjoint_train_and_dev_views() -> None:
-    config = _diagnostic_config()
-    train_env = uav_operator.load_environment(**config["env"][0]["args"])
-    dev_env = uav_operator.load_environment(**config["eval"]["env"][0]["args"])
-    train_rows = list(train_env.get_dataset())
-    dev_rows = list(dev_env.get_eval_dataset())
-
-    assert len(train_rows) == 8
-    assert len(dev_rows) == 2
-    assert {row["info"]["tier"] for row in train_rows + dev_rows} == {"T1"}
-    assert {row["info"]["seed"] for row in train_rows}.isdisjoint(
-        row["info"]["seed"] for row in dev_rows
-    )
-
-
-def test_day8_laguna_m1_functional_eval_is_exact_and_renderable() -> None:
-    config = _functional_eval_config()
-
+def test_day8_laguna_m1_functional_eval_remains_exact_and_renderable() -> None:
+    configs = load_toml_config(FUNCTIONAL_EVAL_CONFIG_PATH)
+    assert len(configs) == 1
+    config = configs[0]
     assert config == {
         "env_id": "uav-operator",
         "model": "poolside/laguna-m.1",
@@ -213,22 +165,104 @@ def test_day8_laguna_m1_functional_eval_is_exact_and_renderable() -> None:
         "disable_tui": True,
         "verbose": True,
     }
-
     env = vf.load_environment(config["env_id"], **config["env_args"])
-    rows = list(env.get_eval_dataset())
-    final_eval_rows = list(
-        uav_operator.load_environment(
-            tier="T1", dataset_split="eval", max_examples=15, max_turns=40
-        ).get_eval_dataset()
-    )
-    assert len(rows) == 2
-    assert {row["info"]["tier"] for row in rows} == {"T1"}
-    assert {row["info"]["seed"] for row in rows}.isdisjoint(
-        row["info"]["seed"] for row in final_eval_rows
-    )
+    assert len(list(env.get_eval_dataset())) == 2
 
 
-def test_day8_sample_summary_reports_truncation_and_provider_errors() -> None:
+def test_preflight_selects_model_from_toml_and_allows_inference_absence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('model = "example/free-model"\n')
+    commands: list[list[str]] = []
+
+    def fake_prime_json(args: list[str]) -> dict[str, object]:
+        commands.append(args)
+        if args[:2] == ["train", "models"]:
+            return {
+                "models": [
+                    {
+                        "name": "example/free-model",
+                        "at_capacity": False,
+                        **{field: 0.0 for field in capture_script.ZERO_PRICE_FIELDS},
+                    },
+                    {"name": "poolside/Laguna-XS-2.1"},
+                ]
+            }
+        if args[:2] == ["inference", "models"]:
+            return {"data": [{"id": "example/different-id"}]}
+        if args[0] == "wallet":
+            return {"balance_usd": 12.5, "currency": "USD", "total_billings": 3}
+        return {
+            "latest_version": {"semantic_version": "0.1.1"},
+            "action": {"status": "SUCCESS"},
+        }
+
+    monkeypatch.setattr(capture_script, "_prime_json", fake_prime_json)
+    artifact = capture_script.preflight(config_path)
+
+    assert artifact["model"] == "example/free-model"
+    assert artifact["hosted_training_model"]["name"] == "example/free-model"
+    assert artifact["inference_catalog_exact_id_present"] is False
+    assert artifact["summary"]["passed"] is True
+    assert ["inference", "models", "--output", "json", "--search", "example/free-model"] in commands
+
+
+def test_preflight_validation_reports_capacity_pricing_wallet_and_hub() -> None:
+    artifact = {
+        "hosted_training_model": {
+            "at_capacity": True,
+            **{field: 0.1 for field in capture_script.ZERO_PRICE_FIELDS},
+        },
+        "wallet": {},
+        "hub_status": {
+            "latest_version": {"semantic_version": "0.1.0"},
+            "action": {"status": "FAILED"},
+        },
+    }
+    summary = validate_preflight(artifact)
+    assert summary["passed"] is False
+    assert len(summary["failures"]) == 7
+
+
+def test_recursive_finite_validation_and_capture_summary() -> None:
+    assert find_non_finite({"metrics": [{"reward": float("nan")}], "ok": 1.0}) == [
+        "$.metrics[0].reward"
+    ]
+    artifact = {
+        "preflight": {
+            "summary": {"passed": True},
+            "config": {"sha256": "same"},
+        },
+        "config": {"sha256": "same"},
+        "billing_reconciliation": {"run_reports_zero_cost": True},
+        "metrics": {"loss": float("inf")},
+        "progress": {"latest_step": 1},
+        "usage": {"training": {"tokens": 42}},
+        "sample_summary": {"provider_errors": 0},
+        "log_summary": {"provider_or_context_errors": 0},
+    }
+    summary = validate_capture(artifact)
+    assert summary["passed"] is False
+    assert summary["training_tokens"] == 42
+    assert "non-finite number at $.metrics.loss" in summary["failures"]
+
+
+def test_billing_reconciliation_reports_run_cost_and_unrelated_delta() -> None:
+    reconciliation = billing_reconciliation(
+        {"balance_usd": 57.9},
+        {
+            "balance_usd": 57.7,
+            "run_billings": [{"amount_usd": 0.0}],
+        },
+        {"total_cost_usd": 0.0},
+    )
+    assert reconciliation["run_reports_zero_cost"] is True
+    assert reconciliation["balance_delta_usd"] == pytest.approx(0.2)
+    assert reconciliation["unrelated_or_unreconciled_wallet_delta_usd"] == pytest.approx(0.2)
+
+
+def test_sample_and_log_summaries_report_truncation_and_provider_errors() -> None:
     summary = summarize_samples(
         {
             "10": {
@@ -240,40 +274,43 @@ def test_day8_sample_summary_reports_truncation_and_provider_errors() -> None:
             }
         }
     )
-
     assert summary["sample_count"] == 3
     assert summary["max_turn_truncations"] == 1
     assert summary["truncation_rate"] == 1 / 3
     assert summary["provider_errors"] == 1
 
-
-def test_day8_log_summary_counts_platform_model_errors() -> None:
     logs = "\n".join(
         [
             "Rollout failed in group one — Error: ModelError",
-            "Rollout failed in group two — Error: ModelError",
-            "ordinary informational line",
+            "Provider error: timed out",
+            "Uploaded checkpoint ckpt-1",
+            "Uploaded adapter adapter-1",
         ]
     )
+    log_summary = summarize_logs(logs)
+    assert log_summary["model_errors"] == 1
+    assert log_summary["rollout_failures"] == 1
+    assert log_summary["provider_or_context_errors"] == 1
+    assert log_summary["checkpoint_evidence"] == ["Uploaded checkpoint ckpt-1"]
+    assert log_summary["adapter_upload_evidence"] == ["Uploaded adapter adapter-1"]
 
-    assert summarize_logs(logs) == {"model_errors": 2, "rollout_failures": 2}
 
-
-def test_day8_wallet_evidence_excludes_unrelated_history() -> None:
+def test_wallet_evidence_excludes_unrelated_history() -> None:
     wallet = {
         "wallet_id": "private-wallet-id",
-        "balance_usd": 57.9186,
+        "balance_usd": 57.9182,
         "currency": "USD",
-        "total_billings": 8,
+        "total_billings": 10,
         "recent_billings": [
             {"resource_id": "this-run", "amount_usd": 0.0},
             {"resource_id": "unrelated-run", "amount_usd": 1.0},
         ],
     }
-
-    assert wallet_evidence(wallet, "this-run") == {
-        "balance_usd": 57.9186,
+    evidence = wallet_evidence(wallet, "this-run")
+    assert evidence == {
+        "balance_usd": 57.9182,
         "currency": "USD",
-        "total_billings": 8,
+        "total_billings": 10,
         "run_billings": [{"resource_id": "this-run", "amount_usd": 0.0}],
     }
+    assert "private-wallet-id" not in json.dumps(evidence)

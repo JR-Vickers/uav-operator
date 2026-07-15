@@ -1,5 +1,36 @@
 # HANDOFF.md
 
+## 2026-07-15 Free Llama Day 8 gates prepared
+
+Changed:
+- Preserved both Laguna configs, run artifacts, and `docs/DAY8_SMOKE.md` as
+  historical evidence.
+- Added a one-step `sprints/Llama-3.2-1B-Instruct` T1 diagnostic and an ordered
+  50-step smoke. Both use batch 16, two rollouts/example, four maximum in
+  flight, 1,024 sampling tokens, and `max_turns = 20`; the smoke evaluates all
+  15 T1 dev rows every 10 steps.
+- Refactored `scripts/capture_day8_training.py` into `preflight` and `capture`
+  commands. Model selection comes from the chosen TOML. Evidence includes the
+  exact Hosted entry, inference-catalog compatibility signal, config hash/text,
+  wallet/Hub status, run data, finite-number checks, billing reconciliation,
+  rollouts, distributions, checkpoints, and adapter-upload log evidence.
+- Added exact config, local environment, seed-isolation, dynamic-model,
+  preflight, finite-number, billing, truncation, and provider-error tests.
+
+Live preparation check:
+- The exact Hosted entry exists, is not at capacity, and its three effective
+  prices are `$0/M`. Ordinary inference lacks the exact `sprints/...` ID and
+  returns the distinct paid `meta-llama/...` ID for the same search.
+- Wallet balance is `$57.9182`; public Hub `0.1.1` quality action is `SUCCESS`.
+- These values must be refreshed by the committed preflight immediately before
+  launch. No training command was invoked during preparation.
+
+Next action:
+- Run the diagnostic preflight, present its artifact and exact manual command,
+  and wait for explicit approval. The user—not the agent—launches the training
+  command without `--yes`. Do not preflight or launch the smoke unless the
+  one-step diagnostic passes every acceptance condition.
+
 ## 2026-07-15 Day 8 smoke stopped at step 0
 
 Changed:
