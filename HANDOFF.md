@@ -110,6 +110,9 @@ Root-cause follow-up:
   two T1 dev rows, one rollout each, serialized sim state/logs, and the standard
   chat-completions client proven by prior Laguna evaluations. The manual command
   is `prime eval run configs/eval/day8_laguna_m1_t1_functional.toml`.
+- Fixed the functional eval to use Verifiers' required `[[eval]]` array-table
+  shape and added a regression test through `load_toml_config`; the initial
+  top-level-only shape was rejected before inference and ran no rollout.
 - This eval can prove that the environment/tool loop functions, but training
   remains blocked until Prime repairs the Laguna XS model alias or a paid model
   present in both catalogs receives explicit budget approval.

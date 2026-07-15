@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 
 import uav_operator
+from verifiers.utils.eval_utils import load_toml_config
 from scripts.capture_day8_training import (
     summarize_logs,
     summarize_samples,
@@ -32,8 +33,9 @@ def _diagnostic_config() -> dict[str, object]:
 
 
 def _functional_eval_config() -> dict[str, object]:
-    with FUNCTIONAL_EVAL_CONFIG_PATH.open("rb") as config_file:
-        return tomllib.load(config_file)
+    configs = load_toml_config(FUNCTIONAL_EVAL_CONFIG_PATH)
+    assert len(configs) == 1
+    return configs[0]
 
 
 def test_day8_hosted_training_config_is_exact() -> None:
