@@ -1,378 +1,188 @@
 # uav-operator
 
-`uav-operator` is a multi-turn Prime Intellect / Verifiers environment where
-an LLM acts as the remote pilot in command for small UAS missions over the San
-Francisco Bay Area.
+`uav-operator` is a multi-turn reinforcement-learning environment for
+supervisory drone operations. An LLM acts as the remote pilot in command for
+small-UAS missions over the San Francisco Bay Area, responding to shifting
+wind, pop-up flight restrictions, battery anomalies, lost-link events, and
+mission updates.
 
-Drones already fly themselves. Autopilots hold trajectories, execute return to
-launch, and enforce simple failsafes. This environment tests the layer above
-that: ops-center judgment under shifting wind, pop-up flight restrictions,
-battery anomalies, lost-link events, and mission updates. The simulator owns
-the aircraft and every reward is computed from logged simulator state, not from
-the model's prose.
+Drones already fly themselves. The simulator's autopilot follows routes, holds
+altitude, executes return-to-launch, and applies simple failsafes. The model is
+tested on the layer above classical control: deciding whether to continue,
+reroute, hold, recover, override, or abort as conditions change.
 
-![UAV ops console: Laguna handles four composed events and lands safely](assets/renders/day7/hero-treasure-island-safe-response.gif)
+Every reward is computed from logged simulator state. The model's prose cannot
+claim success, excuse a violation, or otherwise affect its score.
 
-### Overview
-- **Environment ID**: `uav-operator`
-- **Short description**: Multi-turn UAV operations environment with
-  physics-derived rewards and tool-based operator decisions.
-- **Tags**: `uav`, `drone-operations`, `multi-turn`, `tool-use`, `train`,
-  `eval`
-- **Status**: The environment/tool-loop gate passed, but Day 8 Hosted Training
-  is blocked. Both Laguna XS runs stopped at step 0; the free Llama diagnostic
-  was rejected before run creation because this environment does not meet an
-  undisclosed free-tier eligibility rule. All attempts cost `$0`; the 50-step
-  smoke is not authorized. Platform tickets are pending. Training-independent
-  evaluation tooling, documentation, media preparation, and release hygiene
-  continue, but this project makes no learned-model claim without a successful
-  checkpoint evaluation.
-- **Day 12 preparation**: The trained-adapter adversarial protocol is prepared
-  but has not been executed. The technical article and launch thread are
-  unpublished, training-incomplete drafts with explicit evidence gates; they
-  are planning documents, not project results.
+![UAV operations console showing a composed-event mission that lands safely](assets/renders/day7/hero-treasure-island-safe-response.gif)
 
-### Datasets
-- **Primary dataset(s)**: Seeded scenario generator emitting T0-T3 examples.
-- **Source links**: Static Day 2 world data is generated in-repo with
-  `scripts/build_world.py` from simplified public-structure airspace and
-  synthetic obstacle assumptions.
-- **Current split sizes**: 300 train, 60 dev/calibration, and 60 final eval
-  rows. Each split is stratified evenly across T0-T3; final-eval seeds are
-  never used for dial calibration.
+## What the model controls
 
-### Task
-- **Type**: Multi-turn tool use.
-- **Role**: Remote pilot in command / ops-center operator.
-- **Model decisions**: File or amend plans, query telemetry/weather/airspace,
-  hold, resume, return to launch, land, release payload, abort missions, and
-  override simulator-owned failsafes when justified by the scenario state.
-- **Rubric overview**: Mission value, hard safety violations, reserve and
-  margin policy, procedural compliance, and efficiency. Reward components read
-  only saved `sim_log` snapshots; model prose is inert.
+| Model: operational judgment | Autopilot and simulator: aircraft execution |
+| --- | --- |
+| Query telemetry, weather, airspace, sites, and mission status | Fly filed waypoint routes analytically |
+| File or amend a route | Hold commanded altitude and airspeed |
+| Choose holds, recovery sites, RTL, landing, or mission abort | Advance directly between operational decision points |
+| Release payload and acknowledge alerts | Apply wind, energy use, and seeded event effects |
+| Override a failsafe with a structured justification | Trigger and execute simple built-in failsafes |
 
-### Quickstart
+The action space deliberately excludes stick-level control and trajectory
+micro-corrections. This is an event-driven operations simulator, not a flight
+dynamics integrator.
 
-Install the public Hub release and run a two-example smoke evaluation:
+## Quickstart
+
+Install the published environment from the Prime Intellect Hub:
 
 ```bash
 prime --plain env install jarrett/uav-operator@0.1.1 --prerelease
+```
+
+Run a two-episode evaluation:
+
+```bash
 prime --plain eval run uav-operator -n 2 -r 1 --disable-tui
 ```
 
-`--prerelease` is currently required because the environment's minimum
-Verifiers version is a development release; without the flag, dependency
-resolution rejects otherwise compatible Verifiers and Renderers packages.
+`--prerelease` is required for installation because version `0.1.1` depends on
+a development release of Verifiers.
 
-For source development, clone the repository and create the complete runtime
-and development environment from the lockfile:
+For a source checkout:
 
 ```bash
 uv sync --locked --all-groups
-uv run ruff check .
 uv run pytest -q
-```
-
-Run a small local smoke evaluation:
-
-```bash
 prime --plain eval run uav-operator -n 2 -r 1 --skip-upload --disable-tui
 ```
 
-Configure model, sampling, and saved simulator state:
+See [Development](docs/DEVELOPMENT.md) for local checks, evaluation options,
+baselines, calibration, world-data rebuilding, and renderer dependencies.
+
+## Scenario curriculum
+
+The generated dataset contains 300 train, 60 development/calibration, and 60
+held-out evaluation examples. Each split uses a disjoint deterministic seed
+range and is stratified across four tiers.
+
+| Tier | Operational shape | What it tests |
+| --- | --- | --- |
+| T0 | One mission, no interrupts, generous margins | Harness sanity and basic tool use |
+| T1 | One seeded event with a rulebook-style response | Parsing, procedure, and timely action |
+| T2 | One or two interacting events | Judgment when a naive response loses mission value |
+| T3 | Two to four composed events and tight margins | Tradeoffs across safety, energy, airspace, and mission goals |
+
+T2 and T3 scenarios pass an analytic feasibility check before admission. The
+generator ensures that at least one safe route or recovery response exists; it
+does not guarantee that the original mission remains completable.
+
+## State-only reward
+
+The final scalar reward is the sum of five equally weighted components. Every
+component reads the final and historical snapshots in `state["sim_log"]`;
+none reads prompts, assistant messages, tool-call prose, or the final answer.
+
+| Component | Signal |
+| --- | --- |
+| `mission_value` | Mission completion with briefed timeliness decay |
+| `hard_safety` | Aircraft loss, critical airborne battery outcomes, and airspace incursions |
+| `margin_policy` | Landing reserve, unsafe overrides, and minimum-safe-altitude violations |
+| `procedure` | Unacknowledged alerts, known-conflict filing, and expired holds |
+| `efficiency` | Energy and simulated-time cost relative to scenario par |
+
+This makes natural-language claims inert: success must appear in the physical
+and procedural trajectory.
+
+## Determinism and replay
+
+For a fixed seed and action sequence, the simulator produces the same outcome.
+All randomness flows through one episode-local NumPy generator, including wind
+perturbations, gust fronts, and scenario events. There is no wall-clock or
+unseeded sampling in simulator state transitions.
+
+The simulator advances from decision point to decision point using analytic
+segment time, energy, event, and failsafe calculations. Every decision appends
+a full serializable snapshot to `sim_log`, which is the sole interface used by
+reward functions, saved evidence, red-team checks, and the offline renderer.
+
+The frozen rollout format is documented in [Rollout schema](docs/SCHEMA.md).
+
+## Calibration evidence
+
+![Mean reward by curriculum tier for GPT-4.1-nano and Laguna](assets/evals/day6_tier_scores.png)
+
+The post-fix calibration uses the same development split and fixed sampling for
+both models: 15 examples per tier, two rollouts per example, and zero provider
+errors across all 240 rollouts.
+
+| Model | Tier | Mean reward | Missions completed | Hard-safety outcomes |
+| --- | --- | ---: | ---: | ---: |
+| GPT-4.1-nano | T0 | 0.884 | 30/30 | 0 |
+| GPT-4.1-nano | T1 | -0.055 | 6/30 | 1 |
+| GPT-4.1-nano | T2 | -0.140 | 0/30 | 0 |
+| GPT-4.1-nano | T3 | -0.196 | 0/30 | 0 |
+| Laguna | T0 | 0.998 | 30/30 | 0 |
+| Laguna | T1 | 0.424 | 22/30 | 0 |
+| Laguna | T2 | 0.476 | 29/30 | 0 |
+| Laguna | T3 | 0.095 | 26/30 | 2 |
+
+GPT-4.1-nano provides a weak monotonic reference: near-ceiling performance on
+T0 falls below zero on the event tiers. Laguna remains strong through T2, then
+drops sharply on T3 and records two hard-safety outcomes. This is calibration
+evidence that the implemented tiers separate model capability, not a trained
+model leaderboard.
+
+Confidence intervals, turn counts, run provenance, result paths, and exact
+model identifiers are retained in the
+[machine-readable calibration artifact](assets/evals/day6_frontier_calibration.json).
+
+## Offline renderer
+
+Render any saved rollout that contains the frozen `sim_log` schema:
 
 ```bash
-prime --plain eval run uav-operator \
-  -m poolside/laguna-m.1 \
-  -n 5 \
-  -r 1 \
-  -t 512 \
-  -T 0.2 \
-  --skip-upload \
-  --disable-tui \
-  --save-results \
-  --state-columns sim_state,sim_log
-```
-
-Notes:
-- Put task-owned settings under `[env.taskset]` and harness-owned settings
-  under `[env.harness]` in TOML configs.
-- The core sim is event-driven and analytic. It tests supervisory operator
-  judgment, not low-level flight control or 3D collision physics.
-- Inspect or rebuild the static Day 2 world JSON with
-  `uv run python scripts/build_world.py`.
-- Inspect the deterministic scripted rollout artifact at
-  `assets/rollouts/day3_scripted_rollout.json`.
-- Run local baselines with
-  `uv run python scripts/baselines.py --policy both --episodes 20 --tier all`.
-- Run Day 5 scripted calibration with
-  `uv run python scripts/day5_calibration.py`. Build a frontier plot by passing
-  saved `vf-eval` run directories to `scripts/plot_day5_scores.py`.
-- Run each final frontier tier with fixed sampling, for example:
-  `prime --plain eval run uav-operator -m poolside/laguna-m.1 -n 15 -r 2 -t 512 -T 0.2 --save-results --state-columns sim_state,sim_log`.
-  Repeat for `gpt-5-nano` and record the printed run ID/results path; use taskset
-  tier overrides for `T0` through `T3`.
-- For providers with intermittent rollout errors, use
-  `uv run python scripts/run_frontier_calibration.py --model poolside/laguna-m.1`.
-  It archives failed rows beside the run, resumes only missing per-example
-  slots, and retries until every tier has 30 clean rollouts. Pass
-  `--max-attempts N` to cap retries; the default `0` is intentionally unlimited.
-  Individual rollouts still have a 420-second timeout so one hung provider
-  request cannot block the persistent retry loop.
-
-### Day 8 Hosted Training smoke
-
-Hosted Training now owns orchestration, training, inference, and infrastructure
-selection, so the workflow uses one config instead of separate
-orchestrator/trainer/inference TOMLs or a manually selected pod. The intended
-ordered gate remains
-[`configs/day8_llama_1b_t1_diagnostic.toml`](configs/day8_llama_1b_t1_diagnostic.toml):
-one optimizer step on `sprints/Llama-3.2-1B-Instruct`, with batch 16, two
-rollouts/example, at most four in flight, eight T1 train rows, two T1 dev rows,
-and a 20-turn cap. The backend eligibility denial currently prevents this gate
-from being retried; the config is retained for a verified platform fix. Only if
-the diagnostic eventually passes may
-[`configs/day8_llama_1b_t1_smoke.toml`](configs/day8_llama_1b_t1_smoke.toml)
-run 50 steps with the same workload controls, all 75 T1 train rows, and
-baseline/every-10-step evaluation over all 15 disjoint T1 dev rows. Neither
-config loads final-eval seeds.
-
-Pricing and capacity are volatile. The exact Hosted model entry must remain
-available, below capacity, and exactly `$0/M` for training, inference input,
-and inference output immediately before each launch. A paid model is not a
-fallback. Llama 3.2 1B is a legitimate small open-model pipeline candidate,
-but a successful smoke alone would not prove that it learned the task.
-
-If Prime affirmatively restores eligibility, generate a reproducible preflight
-immediately before the diagnostic:
-
-```bash
-uv run python scripts/capture_day8_training.py preflight \
-  --config configs/day8_llama_1b_t1_diagnostic.toml \
-  --output assets/training/day8_llama_1b_preflight.json
-```
-
-It records the config text/hash, exact Hosted entry, ordinary inference-catalog
-presence or absence, wallet balance, Hub quality action, and free-tier
-environment eligibility, then fails closed unless every gate is affirmative.
-Absence of the exact `sprints/...` ID from ordinary inference is evidence, not
-a blocker: the one-step Hosted diagnostic is the compatibility test. Present
-the artifact, final TOML, `16 × 2` workload, wallet, `$0` estimate, and exact
-command, then wait for explicit approval. The agent does not invoke training;
-the user launches manually without `--yes`:
-
-```bash
-prime --plain train configs/day8_llama_1b_t1_diagnostic.toml
-```
-
-Troubleshooting isolated a live catalog mismatch: Hosted Training advertises
-`poolside/Laguna-XS-2.1`, but Prime Inference returns 404 for that ID and lists
-only the zero-cost `poolside/laguna-m.1`. The latter is inference-only, so the
-committed functional check is deliberately an eval rather than an invalid
-training config:
-
-```bash
-prime eval run configs/eval/day8_laguna_m1_t1_functional.toml
-```
-
-It saves simulator state and logs for two T1 dev rows. Its successful result
-proved end-to-end tool use and offline renderability, but did not unblock
-Hosted Training by itself. Both Laguna Hosted configs and
-[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md) remain unchanged as historical
-failure evidence.
-
-The Llama diagnostic was rejected with HTTP 400 after confirmation but before
-run creation: `jarrett/uav-operator` did not meet the model's additional
-free-tier environment requirements. Model pricing was still exactly `$0/M`,
-Hub action `0.1.1` was `SUCCESS`, and the wallet remained `$57.9182`; those
-checks are not sufficient to prove promotional eligibility. No run ID,
-training tokens, billing row, checkpoint, or adapter exists. The evidence and
-postmortem are in
-[`docs/DAY8_FREE_TRAINING.md`](docs/DAY8_FREE_TRAINING.md). Do not launch the
-50-step smoke or retry unchanged.
-
-After the run, capture the complete reproducible evidence bundle (run metadata,
-metrics, reward histograms, sampled rollouts, token usage and cost, truncation,
-provider errors, checkpoint IDs, logs, pricing, wallet, and Hub status):
-
-```bash
-uv run python scripts/capture_day8_training.py capture <run_id> \
-  --config configs/day8_llama_1b_t1_diagnostic.toml \
-  --preflight assets/training/day8_llama_1b_preflight.json \
-  --steps 0,1 \
-  --output assets/training/day8_llama_1b_diagnostic.json
-```
-
-The capture validates finite numbers recursively, reconciles run billing with
-the preflight wallet snapshot without retaining unrelated wallet history, and
-reports truncation, provider errors, milestone coverage, checkpoints, and
-adapter-upload evidence.
-
-The former provisional 300-step Day 10 run is suspended. Do not select even the
-150-step fallback until a revised free diagnostic reaches a healthy training
-step and exposes enough rollout evidence to separate provider instability from
-turn/context pressure.
-
-### Checkpoint evaluation evidence
-
-The training-independent post-checkpoint path is ready in
-[`scripts/training_evidence.py`](scripts/training_evidence.py), with its
-operational and schema runbook in
-[`docs/TRAINING_EVIDENCE.md`](docs/TRAINING_EVIDENCE.md). Once a real Hosted
-run produces a deployed adapter, prepare each step using its run ID, base model,
-step, and adapter ID. The command verifies read-only Prime provenance,
-deployment readiness, pricing, and wallet state, then emits a frozen 30-rollout
-T1 dev config and the exact manual eval command under ignored
-`outputs/training-evidence/`.
-
-Checkpoint IDs stop at an interactive deployment gate (`prime deployments
-create --checkpoint-id ...`); the script never deploys or evaluates
-automatically.
-After manually capturing step 0 and every requested milestone, `summarize`
-validates seed isolation, logs, finite metrics, provider errors, and manifest
-hashes before producing a curve-ready JSON, reward plot, and ranked same-seed
-before/after candidates. Synthetic plumbing uses fixture provenance and a
-watermarked plot; captured mode rejects it. No synthetic fixture is a project
-result.
-
-### Future trained-adapter red-team round
-
-[`scripts/redteam_day12.py`](scripts/redteam_day12.py) prepares separate frozen
-T2/T3 adversarial configs from a ready training-evidence adapter manifest. It
-preserves the exact committed Day 6 prompt, uses six dev seeds per tier with
-one rollout each, saves simulator state/logs, records price and wallet
-provenance, and emits manual commands only. Nonzero inference pricing requires
-an input-token estimate and explicit cost approval before either command runs.
-
-Its `summarize` command accepts exactly one T2 and one T3 saved run, rejects
-seed leakage, provider errors, malformed logs, fixture provenance in captured
-mode, and any reward mismatch. Every reward component is recomputed from
-`sim_log`; prompt, answer, completion, and other model prose are never
-inspected. The protocol is mechanically tested with ignored synthetic
-fixtures, but no trained adapter or Day 12 result exists.
-
-The [unpublished technical article draft](docs/WRITEUP_DRAFT.md) and
-[not-for-publication thread draft](docs/THREAD_DRAFT.md) use only committed
-training-independent evidence. Their curve, checkpoint, learned-behavior,
-trained-leaderboard, same-seed, and round-two sections remain explicit evidence
-placeholders that fixtures may not fill.
-
-The historical Laguna diagnostic was
-[`configs/day8_laguna_t1_diagnostic.toml`](configs/day8_laguna_t1_diagnostic.toml).
-It attempted one step with batch 16 and at most four in-flight rollouts, while
-holding the original 40-turn and 1,024-token limits constant.
-
-That diagnostic was launched as `hg6jhftohpaognsubyoncy8s` and also failed at
-step 0 after about 29 minutes without training progress. Its clean baseline and
-zero training-token usage reject concurrency alone as the explanation and point
-instead to the Hosted Training policy-inference path. See
-[`docs/DAY8_SMOKE.md`](docs/DAY8_SMOKE.md); do not launch another blind config
-variant until the wrapped provider/platform exception is available.
-
-### Offline rollout renderer
-
-The renderer consumes only a saved JSON object containing frozen-schema
-`sim_log`; it never imports, instantiates, or replays the simulator. The map is
-a 2D supervisory-operations display, not a flight-dynamics or 3D collision
-visualization.
-
-```bash
-uv run python scripts/render.py assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
+uv run python scripts/render.py \
+  assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
   -o out.mp4
+```
 
-# Fully offline vector fallback; no tile cache or network required.
-uv run python scripts/render.py assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
+For a fully offline vector map with no tile access:
+
+```bash
+uv run python scripts/render.py \
+  assets/rollouts/day7/laguna-t3-treasure-island-safe-response.json \
   -o out.mp4 --no-basemap
 ```
 
-Each MP4 is 1920×1080, 30 fps, audio-free H.264/yuv420p. The committed README
-GIF is 960 px wide. Basemap attribution appears in the display and downloaded
-tiles are cached under the ignored `.cache/uav-renderer/` directory.
+The renderer consumes the artifact directly; it does not import, instantiate,
+or replay the live simulator. Additional examples are available in the
+[five-episode contact sheet](assets/renders/day7/contact-sheet.png).
 
-The five clips are fixed zero-based rows from Laguna run
-`day6-t3-clean-retry/results.jsonl`; each compact JSON retains source run, row,
-model, reward, metrics, and the complete `sim_log`:
+## Status and limitations
 
-| Source row | Evidence | Reward | Clip |
-| ---: | --- | ---: | --- |
-| 23 | Treasure Island: four-event safe response (hero) | 0.865 | [MP4](assets/renders/day7/laguna-t3-treasure-island-safe-response.mp4) |
-| 28 | Pier 39: clean composed-event completion | 0.943 | [MP4](assets/renders/day7/laguna-t3-pier-39-clean-completion.mp4) |
-| 4 | Bay Farm: safe completion at 28.9% battery | 0.700 | [MP4](assets/renders/day7/laguna-t3-bay-farm-low-margin.mp4) |
-| 12 | Treasure Island: repeated geofence/override struggle, then success | 0.044 | [MP4](assets/renders/day7/laguna-t3-treasure-island-geofence-struggle.mp4) |
-| 20 | Richmond Channel: battery-depletion aircraft loss | -4.300 | [MP4](assets/renders/day7/laguna-t3-richmond-battery-loss.mp4) |
+The environment, deterministic dataset generator, state-only reward, T0–T3
+calibration workflow, red-team checks, Hub installation, saved-state
+evaluation, and offline rendering path are implemented. The simulator is an
+analytic supervisory-operations abstraction, not high-fidelity aerodynamics,
+vehicle control, or legal airspace guidance.
 
-[View the five-episode trigger/decision/outcome contact sheet](assets/renders/day7/contact-sheet.png).
+There is currently no successful training checkpoint, learning curve, trained
+adapter, or demonstrated learned improvement for this environment. Earlier
+hosted-training attempts did not produce an optimizer step; the detailed
+evidence is retained in the
+[training status report](docs/DAY8_FREE_TRAINING.md). Until a real checkpoint
+is evaluated, this project makes only environment and calibration claims.
 
-The hero's pop-up restriction activates while the aircraft is still on the
-ground during mission intake; it is not presented as a mid-flight TFR. A true
-mid-flight TFR clip and a same-seed before/after-training pair remain deferred
-until suitable saved evidence exists.
+## Documentation
 
-### Day 6 post-fix calibration
+- [Configuration](docs/CONFIGURATION.md): implemented loader settings, split
+  behavior, ownership, and evaluation TOML.
+- [Development](docs/DEVELOPMENT.md): setup, checks, local runs, baselines,
+  calibration, retries, world data, and rendering.
+- [Specification](SPEC.md): simulator, actions, scenarios, and reward design.
+- [Reward-hacking notes](docs/HACKS.md): adversarial probes and closed
+  exploits.
+- [Rollout schema](docs/SCHEMA.md): frozen offline artifact contract.
 
-![GPT-4.1-nano and Laguna reward by curriculum tier](assets/evals/day6_tier_scores.png)
-
-The calibration compares GPT-4.1-nano and Laguna on the same dev split with
-fixed sampling, 30 rollouts per tier, and no provider errors. Error bars are
-95% normal confidence intervals over rollout rewards; `n` is annotated on
-every point.
-
-| Model | Tier | Mean reward | 95% CI | Missions completed | Hard safety | Run ID |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| GPT-4.1-nano | T0 | 0.884 | [0.847, 0.921] | 30/30 | 0 | `cdbac883` |
-| GPT-4.1-nano | T1 | -0.055 | [-0.451, 0.341] | 6/30 | 1 | `d43ac56f` |
-| GPT-4.1-nano | T2 | -0.140 | [-0.158, -0.122] | 0/30 | 0 | `99c64cc4` |
-| GPT-4.1-nano | T3 | -0.196 | [-0.229, -0.162] | 0/30 | 0 | `bde540dd` |
-| Laguna | T0 | 0.998 | [0.996, 1.000] | 30/30 | 0 | `day6-t0-clean-retry` |
-| Laguna | T1 | 0.424 | [0.098, 0.750] | 22/30 | 0 | `day6-t1-clean-retry` |
-| Laguna | T2 | 0.476 | [0.221, 0.731] | 29/30 | 0 | `day6-t2-clean-retry` |
-| Laguna | T3 | 0.095 | [-0.413, 0.603] | 26/30 | 2 | `day6-t3-clean-retry` |
-
-GPT-4.1-nano remains the weak monotonic reference: T0 is near ceiling, T1 is
-materially harder, and T2/T3 stay below zero. Laguna is near ceiling on T0 and
-strong through T2, then drops to `0.095` on T3 with two hard-safety outcomes.
-The fixed simulator therefore produces the intended frontier separation on
-the composed-event tier. All 240 plotted rollouts are free of provider errors;
-the machine-readable results and provenance are in
-[`assets/evals/day6_frontier_calibration.json`](assets/evals/day6_frontier_calibration.json).
-
-Day 6 resolved the Laguna T1 anomaly from the saved rollouts: the T1
-`TFR_POPUP` composition places the restriction over the mission target, and
-Laguna scored 0.93-1.0 on the other three T1 event families but -1.575 on the
-TFR scenarios, burning all 40 turns re-filing conflicting plans instead of
-aborting. Geofence holds now flag `mission_target_inside_zone` so that trap is
-legible. The curve above includes that fix plus Day 6 mid-segment interrupts,
-hover energy, and buffered airspace checks.
-
-### Taskset Config
-Planned fields:
-
-| Field | Type | Default | Description |
-| --- | ---- | ------- | ----------- |
-| `tier` | string | `mixed_day5` | Scenario tier: `T0`–`T3`, `mixed_day5`, or legacy `mixed_day4`. |
-| `dataset_split` | string | internal | Generated split: 300 train rows, 60 dev rows for scripts, or 60 held eval rows. |
-| `seed` | int | `0` | Base seed for deterministic scenario generation. |
-| `max_examples` | int | `-1` | Limit on dataset size; use `-1` for all generated examples. |
-| `wind_enabled` | bool | `true` | Enable seeded Day 3 wind field and altitude shear. |
-| `gust_front_probability` | float | `0.5` | Probability that an episode includes a gust front. |
-| `system_prompt` | string | ops-manual prompt | Override the operator system prompt (used for red-team/adversarial runs). |
-
-### Harness Config
-Planned fields:
-
-| Field | Type | Default | Description |
-| --- | ---- | ------- | ----------- |
-| `max_turns` | int | `40` | Maximum operator decision turns per episode. |
-| `sim_time_cap_min` | int | `90` | Maximum simulated episode duration. |
-
-### Metrics
-Implemented rubric metrics:
-
-| Metric | Meaning |
-| ------ | ------- |
-| `reward` | Main scalar reward, computed from simulator state |
-| `mission_value` | Completed mission value after timeliness decay |
-| `hard_safety` | Airspace incursions, aircraft loss, and critical battery outcomes |
-| `margin_policy` | Reserve, override, and minimum-safe-altitude penalties |
-| `procedure` | Alert acknowledgement, conflict filing, and hold-expiry penalties |
-| `efficiency` | Energy and simulated-time cost relative to scenario par |
+The Hub wheel intentionally contains only `uav_operator.py` and
+`pyproject.toml`. Scripts, documentation, media, and evidence remain in the
+source repository.

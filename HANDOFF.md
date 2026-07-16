@@ -1,5 +1,40 @@
 # HANDOFF.md
 
+## 2026-07-16 Public documentation refocus
+
+Changed:
+
+- Rebuilt `README.md` as an environment-first landing page centered on the
+  operator/autopilot boundary, Hub quickstart, T0-T3 curriculum, state-only
+  reward, deterministic replay, calibration evidence, offline rendering, and
+  honest limitations.
+- Retained the hero GIF and compact eight-row calibration results while moving
+  confidence intervals, run provenance, incident chronology, training
+  operations, and contributor commands behind focused documentation.
+- Added `docs/DEVELOPMENT.md` for source setup, checks, local saved-state
+  evaluations, baselines, calibration and retry scripts, world-data rebuilding,
+  renderer usage, and links to historical training reports.
+- Added `docs/CONFIGURATION.md` for the implemented `load_environment`
+  arguments, defaults, split semantics, taskset/harness ownership, and current
+  Prime eval TOML format.
+- Marked only the README-structure portion of blocked-mode PLAN item 5
+  complete. Additional frozen baseline configs remain unfinished.
+
+Evidence status:
+
+- No simulator, reward, dataset, configuration, packaging, or Python API
+  behavior changed.
+- No training, inference, deployment, or external mutation was performed.
+- The unrelated working-tree change to
+  `assets/training/day8_llama_1b_preflight.json` was preserved untouched.
+- The project still has no successful optimizer step, checkpoint, adapter,
+  learning curve, or demonstrated learned improvement.
+
+Next action:
+
+- Prepare additional frozen baseline evaluation configs or continue the
+  release-hygiene/video work that remains independent of training access.
+
 ## 2026-07-15 Day 12 non-blocked preparation and drafts
 
 Changed:

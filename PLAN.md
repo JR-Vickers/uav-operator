@@ -217,10 +217,12 @@ Work authorized in parallel:
    blocker. Curve, checkpoint selection, learned behavior, trained leaderboard,
    same-seed comparison, and round-two conclusions remain explicit evidence
    placeholders that synthetic fixtures may never fill.
-5. Prepare the README/leaderboard structure and additional frozen baseline eval
-   configs. Any run with a nonzero effective price requires a cost estimate and
-   explicit approval. Do not represent an inference-only model as the Hosted
-   Training base model.
+5. **README STRUCTURE COMPLETE; BASELINE CONFIGS REMAIN.** The public landing
+   page now presents environment, calibration, renderer, and limitations
+   evidence, with contributor and configuration detail moved to focused docs.
+   Additional frozen baseline eval configs remain to be prepared. Any run with
+   a nonzero effective price requires a cost estimate and explicit approval.
+   Do not represent an inference-only model as the Hosted Training base model.
 6. Produce a video rough cut from existing evidence with reserved, visibly
    incomplete slots for a real curve and same-seed trained comparison. Complete
    repository hygiene, license, isolated-install checks, and release checklists,
