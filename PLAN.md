@@ -208,6 +208,25 @@ truncations (8 vs 11). The evaluations cost $0.6253 combined. Freeze step 20
 as the curriculum checkpoint and use its residual 26.7% max-turn truncation
 rate to design the next measured curriculum without touching final-eval seeds.
 
+**Main-cycle preparation amendment (2026-07-20; PREPARED, NOT LAUNCHED).**
+Continue from selected checkpoint `g1akido7qfo58e3my36wnqrz` through three
+separately approved warm-started runs: Phase A is 10 updates at 100% T1;
+Phase B is 20 updates at 40% T1 / 60% T2; Phase C is 20 updates at 25% T1 /
+45% T2 / 30% T3. These are 50 additional warm-started updates, not a claimed
+uninterrupted 70-step optimizer trajectory. Each phase evaluates six dev
+examples from every T0–T3 tier at step 0 and every 10 updates, retains two
+checkpoint/adapter milestones, and requires a passing captured predecessor
+before its successor can be prepared.
+
+The aggregate paid cap is now `$15.00`: `$3.0469` is already spent; Phase
+A/B/C hard ceilings are `$1.25`, `$2.35`, and `$2.40`; `$1.75`, `$0.75`, and
+`$1.25` remain reserved for final candidate comparison, trained-model
+red-team, and frozen evaluation. Hard ceilings total `$12.7969`, leaving
+`$2.2031` unallocated. The exact manual protocol and stop rules are frozen in
+`docs/MAIN_TRAINING.md`. No phase launch is authorized by this preparation;
+each requires refreshed live gates and separate approval after its predecessor
+capture passes.
+
 ### Historical blocked-mode parallel plan (Day 8 is now unblocked)
 
 Day 8 blocks the project's training evidence, not the completed environment.

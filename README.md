@@ -186,12 +186,21 @@ and [comparison plot](assets/training/day8_qwen35_2b_t1_checkpoint_selection.png
 preserve the decision and paired-seed deltas. Earlier free-model failures
 remain in the historical [training status report](docs/DAY8_FREE_TRAINING.md).
 
+The next cycle is prepared as three separately approved, warm-started phases:
+10 T1 updates, 20 mixed T1/T2 updates, then 20 mixed T1/T2/T3 updates. The
+[manual main-training protocol](docs/MAIN_TRAINING.md) freezes the curriculum,
+`$15` fail-closed ledger, provenance chain, stop rules, evidence locations, and
+post-training selection. Preparation tooling is committed; no main phase has
+been launched.
+
 ## Documentation
 
 - [Configuration](docs/CONFIGURATION.md): implemented loader settings, split
   behavior, ownership, and evaluation TOML.
 - [Development](docs/DEVELOPMENT.md): setup, checks, local runs, baselines,
   calibration, retries, world data, and rendering.
+- [Main training](docs/MAIN_TRAINING.md): staged curriculum, manual commands,
+  budgets, phase gates, and final selection.
 - [Specification](SPEC.md): simulator, actions, scenarios, and reward design.
 - [Reward-hacking notes](docs/HACKS.md): adversarial probes and closed
   exploits.

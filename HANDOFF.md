@@ -1,5 +1,34 @@
 # HANDOFF.md
 
+## 2026-07-20 staged main-training cycle prepared; no paid run launched
+
+Changed:
+
+- Added `scripts/main_training.py`, a manual-only `prepare` / `capture` /
+  `budget` command for 10-update T1, 20-update T1/T2, and 20-update T1/T2/T3
+  warm-start phases from selected smoke checkpoint
+  `g1akido7qfo58e3my36wnqrz`.
+- Preparation verifies exact run/model/step/READY provenance, live schema
+  pricing/capacity/wallet/Hub gates, deterministic split isolation, SHA-256,
+  projected usage, and the `$15` fail-closed ledger. B/C require the prior
+  passing capture and exact final checkpoint.
+- Capture validates complete finite metrics, zero provider/cancelled rows,
+  safety and truncation gates, exact READY checkpoint/adapter milestones,
+  cost, and warm-start provenance before writing evidence and a curve.
+- Added fixture coverage for curriculum/config schema, seed isolation,
+  provenance rejection, live/budget failures, phase gates, paired candidate
+  comparison, and smoke exclusion. Documented the complete protocol in
+  `docs/MAIN_TRAINING.md` and updated README/PLAN status.
+
+Next action:
+
+- Live Phase-A preparation was attempted after the green suite. Qwen remained
+  available, but its effective inference-input price is now `$0.05/M`; scaling
+  the smoke's measured token profile projects Phase A at about `$1.4413`, over
+  its `$1.25` hard ceiling. The command correctly failed before writing a
+  launch bundle. Revisit workload sizing or obtain explicit budget direction;
+  do not consume the `$2.2031` aggregate reserve silently and do not launch.
+
 ## 2026-07-20 checkpoint 20 selected on frozen T1 dev evidence
 
 Changed:
