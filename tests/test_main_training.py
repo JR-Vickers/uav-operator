@@ -419,7 +419,7 @@ def _capture_artifact(phase_name: str = "B") -> dict[str, Any]:
             "rows": [
                 {
                     "tier": tier,
-                    "seed": 10_000 + tier_index * 6 + offset,
+                    "seed": 10_000 + offset * 4 + tier_index,
                     "reward": 0.2,
                     "stop_condition": "has_final_env_response",
                     "metrics": {"hard_safety": 0},
@@ -624,13 +624,13 @@ def test_summarize_exact_b_requires_exact_tier_seed_coverage(tmp_path: Path) -> 
         for offset in range(6):
             rows.append(
                 {
-                    "info": {"tier": tier, "seed": 10_000 + tier_index * 6 + offset},
+                    "info": {"tier": tier, "seed": 10_000 + offset * 4 + tier_index},
                     "reward": 0.25,
                     "error": None,
                     "stop_condition": "has_final_env_response",
                     "is_truncated": False,
                     "metrics": {"hard_safety": 0.0},
-                    "sim_state": {"seed": 10_000 + tier_index * 6 + offset},
+                    "sim_state": {"seed": 10_000 + offset * 4 + tier_index},
                     "sim_log": [{}],
                 }
             )

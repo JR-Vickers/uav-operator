@@ -2,6 +2,16 @@
 
 ## 2026-07-20 Phase B exact-adapter validation preparation
 
+Result update:
+
+- Adapter `j21ahkcyttbbu3ponk9on8m5` reached `DEPLOYED`.
+- Exact eval `bfa67b49` saved 7/24 rows before being stopped. Seeds 10005 and
+  10006 returned `ModelError -> NotFoundError` (HTTP 404), so the frozen
+  zero-provider-error gate was irrecoverably breached.
+- Observed cost was `$0.0431932`, below the `$0.35` authorization.
+- Phase B is scientifically failed. No checkpoint refresh, Phase C
+  preparation, or fallback training is permitted by the protocol.
+
 - Switched main-cycle adapter discovery from `prime train models` to the
   deployment registry and require one exact READY run/model/step match.
 - Added a manual exact-adapter deployment/evaluation bundle and a vf-eval

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "uav_operator_main_training_exact_evaluation_failure",
+  "phase": "B",
+  "classification": "scientific_failure_provider_errors",
+  "passed": false,
+  "continuation_ready": false,
+  "training_run_id": "aygdxtalsw85xbznsj0k288m",
+  "adapter_id": "j21ahkcyttbbu3ponk9on8m5",
+  "adapter_step": 40,
+  "adapter_status": "READY",
+  "deployment_status": "DEPLOYED",
+  "checkpoint_id": "ezalshw3415w0z9kb8z56vji",
+  "checkpoint_status": "UPLOADING",
+  "evaluation_run_id": "bfa67b49",
+  "evaluation_job_id": "uav_operator_openai_gpt_4.1_mini_20260720_192743_9f0ef04b",
+  "expected_rows": 24,
+  "completed_rows_before_stop": 7,
+  "provider_error_rows": 2,
+  "provider_error": {
+    "type": "ModelError -> NotFoundError",
+    "http_status": 404,
+    "message": "Requested resource not found.",
+    "affected_seeds": [10005, 10006],
+    "affected_tiers": ["T1", "T2"]
+  },
+  "observed_cost_usd": 0.0431932,
+  "authorized_cost_ceiling_usd": 0.35,
+  "stop_reason": "The preregistered exact evaluation requires zero provider errors; completion could no longer produce a passing artifact.",
+  "decision": "Phase B is scientifically failed. Do not refresh/recover the checkpoint, prepare Phase C, or launch fallback training.",
+  "raw_results_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/bfa67b49/results.jsonl",
+  "raw_metadata_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/bfa67b49/metadata.json"
+}

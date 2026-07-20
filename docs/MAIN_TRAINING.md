@@ -153,6 +153,14 @@ stays blocked. A fallback from READY step-30 checkpoint
 `hq9o5apo977l7hpkk5n0tpaf` would be a new stochastic branch; add its projected
 cost to the `$15` ledger and obtain separate approval before launch.
 
+The authorized run `bfa67b49` failed this gate on 2026-07-20. Two of its first
+seven saved rows returned HTTP 404 `NotFoundError` provider failures, so it was
+stopped at `$0.0431932` rather than spending through an already-invalid
+evaluation. Phase B is scientifically failed. Checkpoint refresh/recovery,
+Phase C preparation, and fallback training are prohibited by the frozen
+decision tree. The partial evidence is committed at
+`assets/training/main_phase_b_exact_step40_failed_provider.json`.
+
 Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
 `ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment
 containers before a different eval slot failed. Both ended at zero steps,

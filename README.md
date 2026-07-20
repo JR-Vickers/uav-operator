@@ -206,6 +206,10 @@ final checkpoint upload remains incomplete. The exact-adapter workflow now
 validates 24 frozen T0–T3 dev rows before classifying the ML result;
 checkpoint readiness is separate and Phase C remains blocked until both gates
 pass. The original Phase-B training cost is `$1.9938`.
+The authorized exact evaluation then failed closed after two HTTP 404 provider
+errors in its first seven saved rows. It was stopped at `$0.0432`; Phase B is
+not a passing scientific result and Phase C remains blocked. See the
+[failure evidence](assets/training/main_phase_b_exact_step40_failed_provider.json).
 
 ## Documentation
 

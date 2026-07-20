@@ -237,6 +237,14 @@ remains an independent continuation gate. Its deterministic exact-adapter
 T0–T3 evaluation is prepared but not authorized. Phase C stays blocked unless
 that evaluation passes and the step-40 checkpoint becomes READY.
 
+**Exact Phase-B result: FAILED (2026-07-20).** Evaluation `bfa67b49` was
+stopped after 7/24 rows when two model requests returned HTTP 404
+`NotFoundError` provider failures. The zero-provider-error gate was already
+irrecoverably breached. Observed cost was `$0.0431932`, below the authorized
+`$0.35` ceiling. Phase B is scientifically failed; do not refresh/recover its
+checkpoint, prepare Phase C, or launch the step-30 fallback branch. Evidence is
+in `assets/training/main_phase_b_exact_step40_failed_provider.json`.
+
 The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
 Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.90` and `$2.40`;
 `$1.75`, `$0.75`, and

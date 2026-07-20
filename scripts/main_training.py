@@ -633,13 +633,14 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         failures.append("mixed-policy hosted milestone is not final checkpoint evidence")
     if len(exact_rows) != 24:
         failures.append("exact-checkpoint evaluation row coverage is incomplete")
-    exact_seed_tiers = {(row.get("seed"), row.get("tier")) for row in exact_rows}
-    expected_seed_tiers = {
-        (10_000 + tier_index * 6 + offset, tier)
-        for tier_index, tier in enumerate(EXACT_TIERS)
-        for offset in range(6)
+    exact_seeds = {row.get("seed") for row in exact_rows}
+    exact_tier_counts = {
+        tier: sum(row.get("tier") == tier for row in exact_rows)
+        for tier in EXACT_TIERS
     }
-    if exact_seed_tiers != expected_seed_tiers:
+    if exact_seeds != set(EXACT_DEV_SEEDS) or exact_tier_counts != {
+        tier: 6 for tier in EXACT_TIERS
+    }:
         failures.append("exact-checkpoint tier/seed coverage is incomplete")
     for tier in ("T0", "T1", "T2", "T3"):
         tier_rows = [row for row in exact_rows if row.get("tier") == tier]
@@ -904,14 +905,15 @@ def summarize_exact_phase_b(
                 "sim_log": row.get("sim_log"),
             }
         )
-    seed_tiers = {(row["seed"], row["tier"]) for row in normalized}
-    # mixed_day5 dev assigns consecutive six-seed blocks by tier.
-    expected_seed_tiers = {
-        (10_000 + tier_index * 6 + offset, tier)
-        for tier_index, tier in enumerate(EXACT_TIERS)
-        for offset in range(6)
+    seeds = {row["seed"] for row in normalized}
+    tier_counts = {
+        tier: sum(row["tier"] == tier for row in normalized) for tier in EXACT_TIERS
     }
-    if len(normalized) != 24 or seed_tiers != expected_seed_tiers:
+    if (
+        len(normalized) != 24
+        or seeds != set(EXACT_DEV_SEEDS)
+        or tier_counts != {tier: 6 for tier in EXACT_TIERS}
+    ):
         raise ValueError("exact mixed-dev tier/seed coverage is incomplete")
     payload = {
         "policy": "exact_checkpoint",
