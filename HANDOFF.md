@@ -27,10 +27,15 @@ Next action:
   the smoke's measured token profile projects Phase A at about `$1.4413`, over
   its original `$1.25` hard ceiling. The user subsequently approved a narrow
   Phase-A increase to `$1.50`. Refreshed preparation now passes at `$1.4413`;
-  the ignored bundle is under `outputs/main-training/phase-a/`, with config
-  SHA-256 `030d809a9392be4da0a5c7d2dc2a14b762c9a539ef3b9b9c9a4cd6a1b65dcf8d`.
-  Present its exact command and obtain final launch approval. Do not infer
-  launch authorization from the budget change alone.
+  the ignored bundle is under `outputs/main-training/phase-a/`.
+- The user confirmed launch, but Prime rejected it before creating a run:
+  `max_steps (10) must be greater than checkpoint step (20)`. No run ID or
+  charge exists. Prime uses absolute global targets for warm starts. Phase A/B/C
+  configs and capture gates are corrected to target steps 30/50/70 while still
+  performing 10/20/20 additional updates. Refreshed Phase-A preparation passes
+  with config SHA-256
+  `2bdd308e3544b56193c9d601420b996fdb3dc5a724fa84b176ac9cfdacbae9dd`.
+  Present the corrected configuration and obtain confirmation before retrying.
 
 ## 2026-07-20 checkpoint 20 selected on frozen T1 dev evidence
 

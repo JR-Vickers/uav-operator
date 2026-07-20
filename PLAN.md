@@ -214,9 +214,14 @@ separately approved warm-started runs: Phase A is 10 updates at 100% T1;
 Phase B is 20 updates at 40% T1 / 60% T2; Phase C is 20 updates at 25% T1 /
 45% T2 / 30% T3. These are 50 additional warm-started updates, not a claimed
 uninterrupted 70-step optimizer trajectory. Each phase evaluates six dev
-examples from every T0–T3 tier at step 0 and every 10 updates, retains two
+examples from every T0–T3 tier at each phase start and every 10 updates, retains two
 checkpoint/adapter milestones, and requires a passing captured predecessor
 before its successor can be prepared.
+
+Prime's warm-start API treats `max_steps` as a global target, so the actual
+targets are 30 for A, 50 for B, and 70 for C. The first approved launch command
+used 10 for Phase A and was rejected before run creation or billing; configs
+and capture gates now preserve the intended 20→30→50→70 checkpoint lineage.
 
 The aggregate paid cap is now `$15.00`: `$3.0469` is already spent; Phase
 A/B/C hard ceilings are `$1.50`, `$2.35`, and `$2.40`; `$1.75`, `$0.75`, and

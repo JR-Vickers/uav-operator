@@ -40,6 +40,7 @@ PRICE_FIELDS = (
 @dataclass(frozen=True)
 class Phase:
     name: str
+    start_step: int
     steps: int
     mixture: tuple[tuple[str, float], ...]
     artifact_interval: int
@@ -49,10 +50,17 @@ class Phase:
 
 
 PHASES = {
-    "A": Phase("A", 10, (("T1", 1.0),), 5, 1.45, 1.50, None),
-    "B": Phase("B", 20, (("T1", 0.4), ("T2", 0.6)), 10, 1.90, 2.35, "A"),
+    "A": Phase("A", 20, 10, (("T1", 1.0),), 5, 1.45, 1.50, None),
+    "B": Phase("B", 30, 20, (("T1", 0.4), ("T2", 0.6)), 10, 1.90, 2.35, "A"),
     "C": Phase(
-        "C", 20, (("T1", 0.25), ("T2", 0.45), ("T3", 0.30)), 10, 1.95, 2.40, "B"
+        "C",
+        50,
+        20,
+        (("T1", 0.25), ("T2", 0.45), ("T3", 0.30)),
+        10,
+        1.95,
+        2.40,
+        "B",
     ),
 }
 
@@ -186,7 +194,7 @@ def phase_toml(phase: Phase, checkpoint_id: str) -> str:
         f'model = "{MODEL}"',
         'loss = "rl"',
         f'checkpoint_id = "{checkpoint_id}"',
-        f"max_steps = {phase.steps}",
+        f"max_steps = {phase.start_step + phase.steps}",
         "",
         "batch_size = 16",
         "rollouts_per_example = 2",
@@ -288,10 +296,11 @@ def resolve_input(
     checkpoint_id = final.get("id", final.get("checkpoint_id"))
     run_id = capture.get("run_id")
     step = final.get("step")
+    predecessor = PHASES[phase.predecessor]
     if (
         not isinstance(checkpoint_id, str)
         or not isinstance(run_id, str)
-        or step != PHASES[phase.predecessor].steps
+        or step != predecessor.start_step + predecessor.steps
     ):
         raise ValueError("predecessor final checkpoint provenance is incomplete")
     return checkpoint_id, run_id, int(step)
@@ -420,7 +429,7 @@ def prepare(
     checkpoint = _checkpoint(checkpoints, checkpoint_id)
     if run.get("id") != source_run_id or run.get("base_model") != MODEL:
         raise ValueError("input run/model provenance mismatch")
-    if checkpoint.get("step") != source_step:
+    if source_step != phase.start_step or checkpoint.get("step") != source_step:
         raise ValueError("input checkpoint step mismatch")
     if checkpoint.get("status") != "READY":
         raise ValueError("input checkpoint status is not READY")
@@ -511,14 +520,15 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         failures.append("run status is not COMPLETED")
     if run.get("base_model") != MODEL or config.get("model") != MODEL:
         failures.append("base model mismatch")
-    if run.get("max_steps") != phase.steps or config.get("max_steps") != phase.steps:
+    final_step = phase.start_step + phase.steps
+    if run.get("max_steps") != final_step or config.get("max_steps") != final_step:
         failures.append("expected phase steps mismatch")
-    expected_train_steps = set(range(phase.steps))
+    expected_train_steps = set(range(phase.start_step, final_step))
     if set(progress.get("steps_with_samples", [])) != expected_train_steps:
         failures.append("sample steps are incomplete")
     if set(progress.get("steps_with_distributions", [])) != expected_train_steps:
         failures.append("distribution steps are incomplete")
-    if progress.get("latest_step") != phase.steps:
+    if progress.get("latest_step") != final_step:
         failures.append("latest optimizer step is incomplete")
     non_finite = []
 
@@ -535,7 +545,7 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     walk(metrics)
     if non_finite:
         failures.append("non-finite metrics: " + ", ".join(non_finite))
-    expected_eval_steps = set(range(0, phase.steps + 1, 10))
+    expected_eval_steps = set(range(phase.start_step, final_step + 1, 10))
     eval_steps = {
         row.get("step")
         for row in metrics
@@ -585,13 +595,13 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     retained_steps = sorted(
         row.get("step") for row in checkpoints if row.get("status") == "READY"
     )
-    expected_retained = [phase.artifact_interval, phase.steps]
+    expected_retained = [phase.start_step + phase.artifact_interval, final_step]
     if retained_steps != expected_retained:
         failures.append("retained READY checkpoint steps are incomplete")
     final_matches = [
         row
         for row in checkpoints
-        if row.get("step") == phase.steps and row.get("status") == "READY"
+        if row.get("step") == final_step and row.get("status") == "READY"
     ]
     if len(final_matches) != 1:
         failures.append("exact final READY checkpoint is unavailable")

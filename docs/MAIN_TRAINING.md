@@ -14,9 +14,9 @@ be prepared. The tool never launches training itself.
 
 | Phase | Updates | Training rows | Input | Eval | Retention |
 |---|---:|---|---|---|---|
-| A | 10 | 100% T1 | smoke step 20 | T0–T3 at 0, 10 | steps 5, 10 |
-| B | 20 | 40% T1 / 60% T2 | Phase-A final READY checkpoint | T0–T3 at 0, 10, 20 | steps 10, 20 |
-| C | 20 | 25% T1 / 45% T2 / 30% T3 | Phase-B final READY checkpoint | T0–T3 at 0, 10, 20 | steps 10, 20 |
+| A | 10 (global 20→30) | 100% T1 | smoke step 20 | T0–T3 at 20, 30 | steps 25, 30 |
+| B | 20 (global 30→50) | 40% T1 / 60% T2 | Phase-A final READY checkpoint | T0–T3 at 30, 40, 50 | steps 40, 50 |
+| C | 20 (global 50→70) | 25% T1 / 45% T2 / 30% T3 | Phase-B final READY checkpoint | T0–T3 at 50, 60, 70 | steps 60, 70 |
 
 Every training tier is its own `[[env]]` using
 `jarrett/uav-operator@0.1.1`, the deterministic `train` split, 75 rows, and a
@@ -28,6 +28,12 @@ Each evaluation milestone uses four separate dev environments (T0–T3), six
 examples per tier, one rollout/example, temperature 0, 1,024 tokens, 20 turns,
 zero retries, and the initial step. No T0 or final-eval row enters training.
 Simulator, reward, prompt, generator, and split semantics remain frozen.
+
+Prime interprets Hosted Training `max_steps` as an absolute global target when
+warm-starting. Therefore the three TOMLs use `max_steps = 30`, `50`, and `70`;
+these still represent 10, 20, and 20 additional updates respectively. An
+initial Phase-A launch attempt with `max_steps = 10` was rejected by the API
+before run creation or billing, which supplied this platform evidence.
 
 ## Budget ledger
 

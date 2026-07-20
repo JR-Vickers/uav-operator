@@ -77,7 +77,7 @@ def _passing_predecessor(
                 "run_cost_usd": 1.0,
                 "final_checkpoint": {
                     "id": checkpoint_id,
-                    "step": main.PHASES[phase].steps,
+                    "step": main.PHASES[phase].start_step + main.PHASES[phase].steps,
                     "status": "READY",
                 },
             },
@@ -93,7 +93,7 @@ def test_phase_configs_are_exact_and_use_only_train_dev(phase_name: str) -> None
     main.validate_phase_config(config, phase, "checkpoint")
     assert config["model"] == main.MODEL
     assert config["checkpoint_id"] == "checkpoint"
-    assert config["max_steps"] == phase.steps
+    assert config["max_steps"] == phase.start_step + phase.steps
     assert config["batch_size"] == 16
     assert config["rollouts_per_example"] == 2
     assert config["max_inflight_rollouts"] == 4
@@ -252,7 +252,7 @@ def test_prepare_b_requires_passing_a_and_exact_final_checkpoint(
     with pytest.raises(ValueError, match="Phase-A capture is required"):
         main.resolve_input(main.PHASES["B"], None)
     path = _passing_predecessor(tmp_path / "a.json", "A", "run-a", "checkpoint-a")
-    assert main.resolve_input(main.PHASES["B"], path) == ("checkpoint-a", "run-a", 10)
+    assert main.resolve_input(main.PHASES["B"], path) == ("checkpoint-a", "run-a", 30)
     payload = json.loads(path.read_text())
     payload["summary"]["passed"] = False
     _write(path, payload)
@@ -299,12 +299,14 @@ def test_prepare_fails_closed_on_live_gates(
 
 def _capture_artifact(phase_name: str = "A") -> dict[str, Any]:
     phase = main.PHASES[phase_name]
+    final_step = phase.start_step + phase.steps
     metrics = [
         {"step": step, f"eval/{main.ENVIRONMENT}/T0/avg@1": 0.2}
-        for step in range(0, phase.steps + 1, 10)
+        for step in range(phase.start_step, final_step + 1, 10)
     ]
     metrics.extend(
-        {"step": step, "reward/all/mean": 0.1} for step in range(phase.steps)
+        {"step": step, "reward/all/mean": 0.1}
+        for step in range(phase.start_step, final_step)
     )
     samples = {
         str(step): {
@@ -316,9 +318,9 @@ def _capture_artifact(phase_name: str = "A") -> dict[str, Any]:
                 for _ in range(6)
             ]
         }
-        for step in range(phase.steps)
+        for step in range(phase.start_step, final_step)
     }
-    intervals = [phase.artifact_interval, phase.steps]
+    intervals = [phase.start_step + phase.artifact_interval, final_step]
     artifact = {
         "phase": phase_name,
         "run_id": f"run-{phase_name}",
@@ -328,13 +330,13 @@ def _capture_artifact(phase_name: str = "A") -> dict[str, Any]:
             "run": {
                 "status": "COMPLETED",
                 "base_model": main.MODEL,
-                "max_steps": phase.steps,
+                "max_steps": final_step,
             }
         },
         "progress": {
-            "latest_step": phase.steps,
-            "steps_with_samples": list(range(phase.steps)),
-            "steps_with_distributions": list(range(phase.steps)),
+            "latest_step": final_step,
+            "steps_with_samples": list(range(phase.start_step, final_step)),
+            "steps_with_distributions": list(range(phase.start_step, final_step)),
         },
         "metrics": {"metrics": metrics},
         "samples_by_step": samples,
@@ -364,7 +366,7 @@ def test_capture_validation_accepts_complete_phase_and_final_checkpoint() -> Non
     artifact = _capture_artifact()
     summary = main.validate_capture(artifact)
     assert summary["passed"] is True
-    assert summary["final_checkpoint"]["id"] == "cp-10"
+    assert summary["final_checkpoint"]["id"] == "cp-30"
 
 
 @pytest.mark.parametrize(
@@ -396,20 +398,20 @@ def test_capture_gates_fail_closed(mutation: str, failure: str) -> None:
         artifact["metrics"]["metrics"] = [
             row
             for row in artifact["metrics"]["metrics"]
-            if not (row["step"] == 10 and any(str(k).startswith("eval/") for k in row))
+            if not (row["step"] == 30 and any(str(k).startswith("eval/") for k in row))
         ]
     elif mutation == "checkpoint":
         artifact["checkpoints"]["checkpoints"].pop()
     elif mutation == "adapter":
         artifact["adapters"]["models"].pop()
     elif mutation == "provider":
-        artifact["samples_by_step"]["0"]["samples"][0]["provider_error"] = "bad"
+        artifact["samples_by_step"]["20"]["samples"][0]["provider_error"] = "bad"
     elif mutation == "cancelled":
-        artifact["samples_by_step"]["0"]["samples"][0]["status"] = "CANCELLED"
+        artifact["samples_by_step"]["20"]["samples"][0]["status"] = "CANCELLED"
     elif mutation == "safety":
-        artifact["samples_by_step"]["0"]["samples"][0]["metrics"]["hard_safety"] = -5
+        artifact["samples_by_step"]["20"]["samples"][0]["metrics"]["hard_safety"] = -5
     elif mutation == "truncation":
-        for row in artifact["samples_by_step"]["0"]["samples"][:4]:
+        for row in artifact["samples_by_step"]["20"]["samples"][:4]:
             row["stop_condition"] = "max_turns_reached"
     elif mutation == "cost":
         artifact["usage"]["total_cost_usd"] = 99
