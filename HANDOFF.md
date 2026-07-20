@@ -1,5 +1,26 @@
 # HANDOFF.md
 
+## 2026-07-20 checkpoint 20 selected on frozen T1 dev evidence
+
+Changed:
+
+- Deployed READY adapters for retained steps 15 and 20 and evaluated each on
+  seeds 10000–10014 with two rollouts/seed, temperature 0, 1,024 tokens/turn,
+  20 turns, concurrency four, zero retries, and saved simulator state/logs.
+- Validated 30 rows per checkpoint with no provider errors or hard-safety
+  violations. Step 20 won the preregistered lexicographic rule: mean reward
+  0.4899 vs 0.4065, 19 vs 16 completions, and 8 vs 11 max-turn truncations.
+- Selected checkpoint `g1akido7qfo58e3my36wnqrz`, adapter
+  `kk1gzp0zrm4xlk8vcug6urn9`. Inference cost was $0.3285 for step 15 and
+  $0.2968 for step 20, $0.6253 combined.
+- Added checkpoint-only selection support and preserved the validated JSON and
+  plot under `assets/training/day8_qwen35_2b_t1_checkpoint_selection.*`.
+
+Next action:
+
+- Freeze step 20 and design the next curriculum around its residual max-turn
+  failures using training/dev seeds only. Keep final-eval seeds untouched.
+
 ## 2026-07-20 Qwen smoke captured; checkpoint comparison prepared
 
 Changed:

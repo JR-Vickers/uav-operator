@@ -485,6 +485,23 @@ def _summarize_one(step: int, run_dir: Path, mode: str) -> tuple[dict[str, Any],
         raise ValueError(f"{run_dir}: eval config hash does not match manifest")
     metadata = _json(run_dir / "metadata.json")
     _validate_metadata(metadata, manifest, run_dir)
+    cost = metadata.get("cost")
+    if manifest.get("provenance") == "captured" and not isinstance(cost, dict):
+        raise ValueError(f"{run_dir}: captured metadata.cost is missing")
+    billing = None
+    if isinstance(cost, dict):
+        input_usd = _finite_number(cost.get("input_usd"), f"{run_dir}.cost.input_usd")
+        output_usd = _finite_number(cost.get("output_usd"), f"{run_dir}.cost.output_usd")
+        total_usd = _finite_number(cost.get("total_usd"), f"{run_dir}.cost.total_usd")
+        if min(input_usd, output_usd, total_usd) < 0:
+            raise ValueError(f"{run_dir}: billing values must not be negative")
+        if not math.isclose(input_usd + output_usd, total_usd, abs_tol=1e-9):
+            raise ValueError(f"{run_dir}: billing total does not reconcile")
+        billing = {
+            "input_usd": input_usd,
+            "output_usd": output_usd,
+            "total_usd": total_usd,
+        }
     rows = _jsonl(run_dir / "results.jsonl")
     if len(rows) != NUM_EXAMPLES * ROLLOUTS_PER_EXAMPLE:
         raise ValueError(f"{run_dir}: expected 30 rollout rows, found {len(rows)}")
@@ -534,12 +551,10 @@ def _summarize_one(step: int, run_dir: Path, mode: str) -> tuple[dict[str, Any],
         if not isinstance(violations, list):
             raise ValueError(f"{label}: hard_safety_violations is missing")
         hard_safety += len(violations)
-        is_truncated = row.get("stop_condition") == "max_turns_reached" or row.get("is_truncated") is True
-        if is_truncated and row.get("stop_condition") != "max_turns_reached":
-            raise ValueError(f"{label}: unsupported truncation outcome")
-        if is_truncated and num_turns != MAX_TURNS:
+        is_max_turn_truncated = row.get("stop_condition") == "max_turns_reached"
+        if is_max_turn_truncated and num_turns != MAX_TURNS:
             raise ValueError(f"{label}: max-turn truncation must occur at {MAX_TURNS} turns")
-        truncated += is_truncated
+        truncated += is_max_turn_truncated
         grouped[seed].append((index, row))
 
     counts = Counter({seed: len(values) for seed, values in grouped.items()})
@@ -571,6 +586,7 @@ def _summarize_one(step: int, run_dir: Path, mode: str) -> tuple[dict[str, Any],
             "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
         },
+        "billing": billing,
         "model_id": manifest["model_id"],
         "training_run_id": manifest["training_run_id"],
         "checkpoint_id": manifest.get("checkpoint_id"),

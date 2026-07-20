@@ -176,9 +176,15 @@ evidence, not yet a demonstrated stable or broader learned improvement.
 The exact run metadata, complete platform metrics, token usage, pricing, and
 checkpoint records are in the
 [machine-readable smoke artifact](assets/training/day8_qwen35_2b_t1_smoke_25.json).
-Checkpoint 15/20 evaluation on frozen identical seeds is prepared but has not
-been deployed or run. Earlier free-model failures remain in the historical
-[training status report](docs/DAY8_FREE_TRAINING.md).
+Captured checkpoint evaluation on identical frozen T1 dev seeds selected step
+20 over step 15 by the preregistered safety-first rule: both had zero hard
+safety violations, while step 20 improved mean reward from 0.4065 to 0.4899,
+completions from 16/30 to 19/30, and max-turn truncations from 11/30 to 8/30.
+The two evaluations cost $0.3285 and $0.2968 ($0.6253 combined). The validated
+[selection JSON](assets/training/day8_qwen35_2b_t1_checkpoint_selection.json)
+and [comparison plot](assets/training/day8_qwen35_2b_t1_checkpoint_selection.png)
+preserve the decision and paired-seed deltas. Earlier free-model failures
+remain in the historical [training status report](docs/DAY8_FREE_TRAINING.md).
 
 ## Documentation
 

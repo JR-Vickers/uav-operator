@@ -508,3 +508,45 @@ def test_malformed_log_and_nonfinite_metric_fail_closed(tmp_path: Path) -> None:
     _complete_run(baseline, 0, rows)
     with pytest.raises(ValueError, match="finite number"):
         evidence._summarize_one(0, baseline, "synthetic_fixture")
+
+
+@pytest.mark.parametrize("criterion", ["safety", "reward", "completion", "truncation"])
+def test_checkpoint_selection_applies_each_lexicographic_tie_break(
+    tmp_path: Path, criterion: str
+) -> None:
+    step15 = _prepare_run(tmp_path, 15)
+    step20 = _prepare_run(tmp_path, 20)
+    rows15 = _rows(15)
+    rows20 = _rows(20)
+    for rows in (rows15, rows20):
+        for row in rows:
+            row["reward"] = 0.0
+            row["num_turns"] = 4.0
+            row["is_truncated"] = False
+            row["stop_condition"] = "has_final_env_response"
+            row["sim_log"][-1]["mission"]["status"] = "pending"
+            row["sim_log"][-1]["hard_safety_violations"] = []
+            row["sim_state"]["hard_safety_violations"] = []
+    if criterion == "safety":
+        rows15[0]["sim_log"][-1]["hard_safety_violations"] = ["aircraft_loss"]
+    elif criterion == "reward":
+        rows20[0]["reward"] = 1.0
+    elif criterion == "completion":
+        rows20[0]["sim_log"][-1]["mission"]["status"] = "completed"
+    else:
+        rows15[0]["num_turns"] = 20.0
+        rows15[0]["is_truncated"] = True
+        rows15[0]["stop_condition"] = "max_turns_reached"
+    _complete_run(step15, 15, rows15)
+    _complete_run(step20, 20, rows20)
+
+    payload = evidence.select_checkpoints(
+        checkpoints=[(15, step15), (20, step20)],
+        output_json=tmp_path / "selection.json",
+        output_plot=tmp_path / "selection.png",
+        mode="synthetic_fixture",
+    )
+
+    assert payload["winner"]["step"] == 20
+    assert len(payload["paired_per_seed"]) == 15
+    assert payload["paired_per_seed"][0]["seed"] == 10000

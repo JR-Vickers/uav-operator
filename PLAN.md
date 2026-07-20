@@ -200,12 +200,13 @@ eval as the completed environment/tool-loop gate. Laguna M.1 is not in the
 Hosted Training catalog and cannot be substituted into the training TOML. That
 finding led to the separate free Llama diagnostic, which the backend denied on
 environment eligibility as recorded above. The later paid Qwen amendment
-supersedes that historical free-path blocker. Before a main run, evaluate
-retained checkpoints 15 and 20 on identical frozen T1 dev seeds, select by
-held-out state-derived evidence, and use the observed truncation/curve to
-freeze the next curriculum. The checkpoint manifests are prepared under
-`outputs/training-evidence/vhuh1or0bar3cht6ql0jzazs/`; deployment and inference
-remain separate manual paid actions.
+supersedes that historical free-path blocker. Retained checkpoints 15 and 20
+were evaluated on identical frozen T1 dev seeds with 30 rollouts each. Both had
+zero hard-safety violations; the preregistered rule selected step 20 on mean
+reward (0.4899 vs 0.4065), with more completions (19 vs 16) and fewer max-turn
+truncations (8 vs 11). The evaluations cost $0.6253 combined. Freeze step 20
+as the curriculum checkpoint and use its residual 26.7% max-turn truncation
+rate to design the next measured curriculum without touching final-eval seeds.
 
 ### Historical blocked-mode parallel plan (Day 8 is now unblocked)
 
