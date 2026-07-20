@@ -1,5 +1,17 @@
 # HANDOFF.md
 
+## 2026-07-20 Phase A launched
+
+- User explicitly confirmed the corrected global-step launch. Hosted Training
+  run `j31uthcbwxg2zcapdy4vxtje` was created from smoke checkpoint
+  `g1akido7qfo58e3my36wnqrz`, targeting global step 30 (10 additional T1
+  updates). The server-returned configuration matches batch 16, two rollouts,
+  four in flight, four six-example T0–T3 dev evaluations, zero retries, and
+  the captured `$0.15/$0.05/$0.15` per-Mtoken prices.
+- Initial status is `PENDING`, with no optimizer step, tokens, or cost yet.
+  Monitor for startup and enforce the 15-minute no-progress and `$1.50` stop
+  gates. Capture and validate the complete run before preparing Phase B.
+
 ## 2026-07-20 staged main-training cycle prepared; no paid run launched
 
 Changed:
