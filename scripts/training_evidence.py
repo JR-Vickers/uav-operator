@@ -664,6 +664,103 @@ def summarize(
     return payload
 
 
+def select_checkpoints(
+    *,
+    checkpoints: Iterable[tuple[int, Path]],
+    output_json: Path,
+    output_plot: Path,
+    mode: str = "captured",
+) -> dict[str, Any]:
+    """Validate two checkpoint-only evals and select one by frozen tie-breaks.
+
+    This intentionally does not accept step 0: checkpoint selection must use
+    the captured dev workload, not a training or baseline aggregate.
+    """
+    if mode not in PROVENANCE_VALUES:
+        raise ValueError(f"unsupported mode {mode!r}")
+    supplied = list(checkpoints)
+    if len(supplied) != 2 or len({step for step, _ in supplied}) != 2:
+        raise ValueError("checkpoint selection requires exactly two distinct steps")
+    summaries: list[dict[str, Any]] = []
+    seed_results: dict[int, dict[int, dict[str, Any]]] = {}
+    identities: set[tuple[Any, ...]] = set()
+    provenances: set[str] = set()
+    for step, path in supplied:
+        summary, per_seed = _summarize_one(step, path, mode)
+        manifest = _json(_preparation_dir(path) / "manifest.json")
+        if not manifest.get("checkpoint_id") or not manifest.get("adapter_id"):
+            raise ValueError(f"step {step}: checkpoint and adapter identity are required")
+        provenances.add(str(manifest.get("provenance")))
+        identities.add((manifest.get("training_run_id"), manifest.get("base_model")))
+        summaries.append(summary)
+        seed_results[step] = per_seed
+    if len(identities) != 1 or len(provenances) != 1:
+        raise ValueError("checkpoint manifests do not share training run and base model")
+    if mode == "captured" and provenances != {"captured"}:
+        raise ValueError("captured mode rejects fixture provenance")
+    if mode == "synthetic_fixture" and provenances != {"synthetic_fixture"}:
+        raise ValueError("synthetic fixture mode requires fixture provenance")
+    summaries.sort(key=lambda item: item["step"])
+    ranked = sorted(
+        summaries,
+        key=lambda item: (
+            item["hard_safety_count"],
+            -item["reward_mean"],
+            -item["mission_completion_count"],
+            item["max_turn_truncation_count"],
+        ),
+    )
+    winner = ranked[0]
+    loser = ranked[1]
+    winner_key = (
+        winner["hard_safety_count"], -winner["reward_mean"],
+        -winner["mission_completion_count"], winner["max_turn_truncation_count"],
+    )
+    loser_key = (
+        loser["hard_safety_count"], -loser["reward_mean"],
+        -loser["mission_completion_count"], loser["max_turn_truncation_count"],
+    )
+    paired = []
+    for seed in DEV_SEEDS:
+        left, right = (seed_results[s][seed] for s in (summaries[0]["step"], summaries[1]["step"]))
+        paired.append({"seed": seed, "step_a": summaries[0]["step"], "step_b": summaries[1]["step"],
+                       "step_a_mean_reward": left["mean_reward"], "step_b_mean_reward": right["mean_reward"],
+                       "reward_delta": right["mean_reward"] - left["mean_reward"],
+                       "step_a_source_row_indices": left["source_row_indices"],
+                       "step_b_source_row_indices": right["source_row_indices"]})
+    payload = {
+        "schema_version": 1, "kind": "uav_operator_checkpoint_selection",
+        "provenance": provenances.pop(),
+        "watermark": FIXTURE_WATERMARK if mode == "synthetic_fixture" else None,
+        "selection_rule": "fewer hard-safety violations; higher mean reward; more completions; fewer truncations",
+        "checkpoints": summaries,
+        "paired_per_seed": paired,
+        "winner": {"step": winner["step"], "checkpoint_id": winner["checkpoint_id"], "adapter_id": winner["adapter_id"],
+                    "metrics": winner, "selection_key": winner_key,
+                    "rationale": "lexicographic frozen safety/reward/completion/truncation rule"},
+        "loser_selection_key": loser_key,
+    }
+    _write_json(output_json, payload)
+    _plot_selection(payload, output_plot)
+    return payload
+
+
+def _plot_selection(payload: dict[str, Any], output: Path) -> None:
+    import matplotlib.pyplot as plt
+    items = payload["checkpoints"]
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.bar([str(item["step"]) for item in items], [item["reward_mean"] for item in items],
+           yerr=[[item["reward_mean"] - item["reward_ci95_low"] for item in items],
+                 [item["reward_ci95_high"] - item["reward_mean"] for item in items]], capsize=5)
+    ax.set_xlabel("Training step")
+    ax.set_ylabel("Mean T1 dev reward (95% CI)")
+    ax.set_title("uav-operator checkpoint selection")
+    fig.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=180)
+    plt.close(fig)
+
+
 def _plot(payload: dict[str, Any], output: Path) -> None:
     import matplotlib.pyplot as plt
 
@@ -736,6 +833,11 @@ def _parser() -> argparse.ArgumentParser:
     summarize_parser.add_argument("--output-json", required=True, type=Path)
     summarize_parser.add_argument("--output-plot", required=True, type=Path)
     summarize_parser.add_argument("--mode", choices=PROVENANCE_VALUES, default="captured")
+    select_parser = commands.add_parser("select-checkpoints")
+    select_parser.add_argument("checkpoints", nargs=2, type=_milestone)
+    select_parser.add_argument("--output-json", required=True, type=Path)
+    select_parser.add_argument("--output-plot", required=True, type=Path)
+    select_parser.add_argument("--mode", choices=PROVENANCE_VALUES, default="captured")
     return parser
 
 
@@ -753,10 +855,17 @@ def main() -> None:
                 fixture_metadata_dir=args.fixture_metadata_dir,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
-        else:
+        elif args.command == "summarize":
             payload = summarize(
                 milestones=args.milestones,
                 expected_steps=args.expected_steps,
+                output_json=args.output_json,
+                output_plot=args.output_plot,
+                mode=args.mode,
+            )
+        else:
+            payload = select_checkpoints(
+                checkpoints=args.checkpoints,
                 output_json=args.output_json,
                 output_plot=args.output_plot,
                 mode=args.mode,
