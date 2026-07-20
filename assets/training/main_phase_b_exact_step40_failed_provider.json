@@ -25,9 +25,23 @@
     "affected_tiers": ["T1", "T2"]
   },
   "observed_cost_usd": 0.0431932,
+  "retry": {
+    "evaluation_run_id": "eb93c282",
+    "evaluation_job_id": "uav_operator_openai_gpt_4.1_mini_20260720_193815_94d8e7d6",
+    "completed_rows_before_stop": 4,
+    "provider_error_rows": 2,
+    "provider_error_rate": 0.5,
+    "affected_seeds": [10002, 10003],
+    "affected_tiers": ["T2", "T3"],
+    "request_region": "KUL",
+    "observed_cost_usd": 0.0083627,
+    "raw_results_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/eb93c282/results.jsonl",
+    "raw_metadata_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/eb93c282/metadata.json"
+  },
+  "cumulative_observed_cost_usd": 0.0515559,
   "authorized_cost_ceiling_usd": 0.35,
   "stop_reason": "The preregistered exact evaluation requires zero provider errors; completion could no longer produce a passing artifact.",
-  "decision": "Phase B is scientifically failed. Do not refresh/recover the checkpoint, prepare Phase C, or launch fallback training.",
+  "decision": "The retry reproduced provider 404s. Phase B is scientifically failed under the frozen gate. Do not refresh/recover the checkpoint, prepare Phase C, or launch fallback training.",
   "raw_results_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/bfa67b49/results.jsonl",
   "raw_metadata_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/bfa67b49/metadata.json"
 }

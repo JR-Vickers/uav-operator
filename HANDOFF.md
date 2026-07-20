@@ -11,6 +11,10 @@ Result update:
 - Observed cost was `$0.0431932`, below the `$0.35` authorization.
 - Phase B is scientifically failed. No checkpoint refresh, Phase C
   preparation, or fallback training is permitted by the protocol.
+- Identical retry `eb93c282` reproduced two HTTP 404 provider failures in its
+  first four rows (T2 seed 10002 and T3 seed 10003) and was stopped at
+  `$0.0083627`. Cumulative saved-metadata cost is `$0.0515559`; the gate remains
+  failed.
 
 - Switched main-cycle adapter discovery from `prime train models` to the
   deployment registry and require one exact READY run/model/step match.

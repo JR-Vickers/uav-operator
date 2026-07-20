@@ -244,6 +244,10 @@ irrecoverably breached. Observed cost was `$0.0431932`, below the authorized
 `$0.35` ceiling. Phase B is scientifically failed; do not refresh/recover its
 checkpoint, prepare Phase C, or launch the step-30 fallback branch. Evidence is
 in `assets/training/main_phase_b_exact_step40_failed_provider.json`.
+An explicitly requested identical retry `eb93c282` reproduced two HTTP 404
+failures in its first four rows and was stopped at `$0.0083627`. Cumulative
+saved-metadata cost across both attempts is `$0.0515559`. The repeated
+provider failure leaves the gate result unchanged.
 
 The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
 Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.90` and `$2.40`;

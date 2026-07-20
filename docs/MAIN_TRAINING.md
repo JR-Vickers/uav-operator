@@ -160,6 +160,9 @@ evaluation. Phase B is scientifically failed. Checkpoint refresh/recovery,
 Phase C preparation, and fallback training are prohibited by the frozen
 decision tree. The partial evidence is committed at
 `assets/training/main_phase_b_exact_step40_failed_provider.json`.
+User-requested retry `eb93c282` reproduced two provider 404s within its first
+four rows and was stopped at `$0.0083627`; cumulative metadata cost across the
+two attempts is `$0.0515559`. This does not reopen the scientific gate.
 
 Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
 `ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment

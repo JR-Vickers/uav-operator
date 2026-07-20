@@ -210,6 +210,9 @@ The authorized exact evaluation then failed closed after two HTTP 404 provider
 errors in its first seven saved rows. It was stopped at `$0.0432`; Phase B is
 not a passing scientific result and Phase C remains blocked. See the
 [failure evidence](assets/training/main_phase_b_exact_step40_failed_provider.json).
+An identical retry reproduced two provider 404s in its first four rows, making
+the failure repeatable across evaluation attempts; cumulative metadata cost was
+`$0.0516`.
 
 ## Documentation
 
