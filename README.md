@@ -165,12 +165,20 @@ evaluation, and offline rendering path are implemented. The simulator is an
 analytic supervisory-operations abstraction, not high-fidelity aerodynamics,
 vehicle control, or legal airspace guidance.
 
-There is currently no successful training checkpoint, learning curve, trained
-adapter, or demonstrated learned improvement for this environment. Earlier
-hosted-training attempts did not produce an optimizer step; the detailed
-evidence is retained in the
-[training status report](docs/DAY8_FREE_TRAINING.md). Until a real checkpoint
-is evaluated, this project makes only environment and calibration claims.
+A paid 25-step Qwen3.5-2B LoRA GRPO smoke completed with zero provider errors
+and retained READY checkpoints at steps 15 and 20. Its held-out T1 development
+reward rose from 0.2660 at the base evaluation to 0.4379 at step 25, but the
+curve is noisy and final truncation reached 26.7%. This is genuine training
+evidence, not yet a demonstrated stable or broader learned improvement.
+
+![Qwen3.5-2B smoke-run training and held-out reward](assets/training/day8_qwen35_2b_t1_smoke_25_curve.png)
+
+The exact run metadata, complete platform metrics, token usage, pricing, and
+checkpoint records are in the
+[machine-readable smoke artifact](assets/training/day8_qwen35_2b_t1_smoke_25.json).
+Checkpoint 15/20 evaluation on frozen identical seeds is prepared but has not
+been deployed or run. Earlier free-model failures remain in the historical
+[training status report](docs/DAY8_FREE_TRAINING.md).
 
 ## Documentation
 

@@ -1,0 +1,42 @@
+name = "uav-operator-day8-qwen35-2b-t1-smoke-25"
+model = "Qwen/Qwen3.5-2B"
+loss = "rl"
+max_steps = 25
+
+batch_size = 16
+rollouts_per_example = 2
+max_inflight_rollouts = 4
+learning_rate = 3e-5
+lora_alpha = 32
+
+[sampling]
+max_tokens = 1024
+temperature = 0.7
+enable_thinking = false
+
+[[env]]
+id = "jarrett/uav-operator@0.1.1"
+args = { tier = "T1", dataset_split = "train", max_examples = 75, max_turns = 20 }
+
+[eval]
+interval = 5
+num_examples = 15
+rollouts_per_example = 2
+skip_first_step = false
+
+[[eval.env]]
+id = "jarrett/uav-operator@0.1.1"
+args = { tier = "T1", dataset_split = "dev", max_examples = 15, max_turns = 20 }
+
+[eval.sampling]
+max_tokens = 1024
+temperature = 0.0
+enable_thinking = false
+
+[checkpoints]
+interval = 5
+keep_cloud = 2
+
+[adapters]
+interval = 5
+keep_last = 3

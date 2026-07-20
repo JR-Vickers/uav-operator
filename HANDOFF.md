@@ -1,5 +1,123 @@
 # HANDOFF.md
 
+## 2026-07-20 Qwen smoke captured; checkpoint comparison prepared
+
+Changed:
+
+- Captured completed run `vhuh1or0bar3cht6ql0jzazs` in
+  `assets/training/day8_qwen35_2b_t1_smoke_25.json` and generated the real
+  held-out/training curve PNG beside it. Validation passes with complete
+  step-0..24 samples/distributions, eval milestones 0/5/10/15/20/25, `$2.2716`
+  cost, and READY checkpoints 15/20.
+- Added `scripts/capture_paid_smoke.py`; it captures metrics and metadata but
+  intentionally stores no model prose.
+- Prepared captured checkpoint manifests for steps 15 and 20 under ignored
+  `outputs/training-evidence/vhuh1or0bar3cht6ql0jzazs/`. No deployment or
+  inference occurred.
+- Updated README and PLAN to replace the stale no-checkpoint/blocked status.
+
+Next action:
+
+- With explicit approval, manually deploy checkpoints 15 and 20. Rerun the
+  evidence preparation with the returned adapter IDs, then run both identical
+  frozen T1 dev evaluations. Conservative combined inference ceiling: `$0.50`.
+
+## 2026-07-19 Qwen3.5-2B 25-step smoke authorized
+
+Changed:
+
+- Added `configs/day8_qwen35_2b_t1_smoke_25.toml` for the user-approved
+  25-step paid smoke. It retains batch 16, 75 T1 train rows, all 15 T1 dev
+  rows, two rollouts/example, and 20 turns; eval, checkpoint, and adapter
+  intervals are five steps.
+- Projected incremental cost is approximately `$2.58` from the diagnostic's
+  measured token profile; use `$3.00` as the hard launch stop. Together with
+  the completed `$0.15` diagnostic, this remains below the `$3.75`
+  diagnostic-plus-smoke gate.
+
+Next action:
+
+- User launches the interactive `prime train` command and captures the run ID.
+  Stop the run if reported cost reaches `$3.00`, repeated provider errors
+  appear, or progress stalls for 15 minutes.
+
+## 2026-07-19 Qwen3.5-2B diagnostic compute passed; checkpoint/budget gates open
+
+Outcome:
+
+- Paid run `vdl1vmihdlodgr88nqcqe2rq` completed one step on
+  `Qwen/Qwen3.5-2B`: 161,176 training tokens, 3,997,443 inference-input tokens,
+  140,102 inference-output tokens, and `$0.15` total reported cost.
+- The run produced 16/16 trainable rollouts, finite metrics, retrievable
+  samples and a reward distribution, with zero provider errors. This clears
+  model/environment compatibility and optimizer execution.
+- Prime logged `Writing final checkpoint`, but `prime train checkpoints`
+  continued to return `No checkpoints found for this run`; no adapter-upload
+  evidence was exposed. Artifact persistence is therefore not cleared.
+- The observed 4.14M inference tokens make the earlier `$3.75`
+  diagnostic-plus-50-step projection unsafe. No 50-step launch is authorized
+  until its workload is reduced or a measured projection preserves the
+  aggregate `$10.00` cap and `$0.75` reserve.
+
+Next action:
+
+- Recheck checkpoint propagation once, then design a smaller measured smoke
+  that can support the complete remaining PLAN rather than consuming the
+  budget on Day 8 alone. Obtain separate approval before launching it.
+
+## 2026-07-19 Qwen3.5-2B paid diagnostic authorized
+
+Changed:
+
+- Amended `PLAN.md` for a user-approved, aggregate `$10.00` paid path using
+  `Qwen/Qwen3.5-2B`, with `$0.20` diagnostic, `$3.75` diagnostic-plus-smoke,
+  `$9.25` projection, and `$0.75` reserve gates.
+- Added `configs/day8_qwen35_2b_t1_diagnostic.toml`: one step, batch 16, two
+  rollouts/example, four in flight, eight T1 train rows, two T1 dev rows,
+  20 turns, and 1,024 sampling tokens.
+
+Next action:
+
+- User launches the interactive one-step command after verifying the displayed
+  Qwen3.5-2B prices. Capture and reconcile the run before any smoke launch.
+
+## 2026-07-19 Laguna XS Hosted Training retry reproduced step-0 failure
+
+Changed:
+
+- Captured the user-launched one-step Hosted Training diagnostic
+  `txkxxxl1404r694dcmw2rzkh` in
+  `assets/training/day8_laguna_t1_retry.json`, with its matching fresh
+  preflight in `assets/training/day8_laguna_t1_retry_preflight.json`.
+- Updated `docs/DAY8_FREE_TRAINING.md` with the run’s exact outcome.
+- Added `scripts/laguna_xs_escalation.py` and generated
+  `docs/LAGUNA_XS_PLATFORM_PROBE.md`, a fact-grounded support request for
+  platform-side plain-chat/tool probes and deployment revision details.
+- Added `scripts/laguna_local_smoke.py`: an ephemeral, no-weights Laguna
+  tokenizer/renderer compatibility check for the real T1 prompt and tool loop.
+
+Evidence status:
+
+- `poolside/Laguna-XS-2.1` was live, not at capacity, and effective training,
+  inference-input, and inference-output prices were all `$0/M`.
+- The run stopped at step 0 after 200 dispatcher-level `ModelError`s. It used
+  zero training tokens, yielded no samples, distributions, checkpoint, or
+  adapter, and reported `$0.00` total cost. Both environment servers succeeded;
+  no simulator exception or specific upstream stack trace was exposed.
+- This reproduces the prior Hosted policy-inference failure. It is not a
+  successful optimizer step and creates no learning evidence.
+- The official tokenizer and public Prime renderer at `983901a` both render
+  the real prompt and an OpenAI-string tool-call/result round trip successfully
+  (1,671 / 1,699 tokens). The environment-side prompt/schema is therefore not
+  the cause against that public renderer revision; the private deployed image
+  remains unverified.
+
+Next action:
+
+- Do not relaunch Laguna unchanged. Request the underlying policy-inference
+  error and deployed model/tokenizer/renderer revisions from Prime; resume only
+  after a confirmed material platform change.
+
 ## 2026-07-16 Public documentation refocus
 
 Changed:

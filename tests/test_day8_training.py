@@ -8,6 +8,7 @@ import pytest
 import uav_operator
 import verifiers as vf
 from scripts import capture_day8_training as capture_script
+from scripts.capture_paid_smoke import validate_capture as validate_paid_smoke
 from scripts.capture_day8_training import (
     billing_reconciliation,
     find_non_finite,
@@ -17,11 +18,20 @@ from scripts.capture_day8_training import (
     validate_preflight,
     wallet_evidence,
 )
+from scripts.laguna_xs_escalation import build_escalation_request
+from scripts.laguna_local_smoke import initial_messages, validate_tool_defs
 from verifiers.utils.eval_utils import load_toml_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIAGNOSTIC_CONFIG_PATH = REPO_ROOT / "configs" / "day8_llama_1b_t1_diagnostic.toml"
+QWEN_DIAGNOSTIC_CONFIG_PATH = (
+    REPO_ROOT / "configs" / "day8_qwen35_2b_t1_diagnostic.toml"
+)
+QWEN_SMOKE_CONFIG_PATH = REPO_ROOT / "configs" / "day8_qwen35_2b_t1_smoke_25.toml"
+QWEN_SMOKE_CAPTURE_PATH = (
+    REPO_ROOT / "assets" / "training" / "day8_qwen35_2b_t1_smoke_25.json"
+)
 SMOKE_CONFIG_PATH = REPO_ROOT / "configs" / "day8_llama_1b_t1_smoke.toml"
 FUNCTIONAL_EVAL_CONFIG_PATH = (
     REPO_ROOT / "configs" / "eval" / "day8_laguna_m1_t1_functional.toml"
@@ -33,6 +43,63 @@ LLAMA_DIAGNOSTIC_PATH = (
     REPO_ROOT / "assets" / "training" / "day8_llama_1b_diagnostic.json"
 )
 MODEL = "sprints/Llama-3.2-1B-Instruct"
+
+
+def test_day8_paid_qwen_diagnostic_is_bounded() -> None:
+    config = _load(QWEN_DIAGNOSTIC_CONFIG_PATH)
+
+    assert config["model"] == "Qwen/Qwen3.5-2B"
+    assert config["max_steps"] == 1
+    assert config["batch_size"] == 16
+    assert config["rollouts_per_example"] == 2
+    assert config["max_inflight_rollouts"] == 4
+    assert config["env"][0]["args"] == {
+        "tier": "T1",
+        "dataset_split": "train",
+        "max_examples": 8,
+        "max_turns": 20,
+    }
+    assert config["eval"]["num_examples"] == 2
+    assert config["eval"]["rollouts_per_example"] == 2
+    assert config["eval"]["env"][0]["args"]["dataset_split"] == "dev"
+
+
+def test_day8_paid_qwen_smoke_is_bounded_and_capture_passes() -> None:
+    config = _load(QWEN_SMOKE_CONFIG_PATH)
+    capture = json.loads(QWEN_SMOKE_CAPTURE_PATH.read_text())
+
+    assert config["model"] == "Qwen/Qwen3.5-2B"
+    assert config["max_steps"] == 25
+    assert config["eval"]["interval"] == 5
+    assert config["checkpoints"]["interval"] == 5
+    assert config["adapters"]["interval"] == 5
+    assert capture["summary"]["passed"] is True
+    assert validate_paid_smoke(capture)["passed"] is True
+    assert capture["summary"]["run_cost_usd"] == pytest.approx(2.2716)
+    assert capture["summary"]["ready_checkpoint_steps"] == [15, 20]
+
+
+def test_laguna_escalation_request_is_grounded_in_captured_run() -> None:
+    capture_path = REPO_ROOT / "assets" / "training" / "day8_laguna_t1_retry.json"
+    capture = json.loads(capture_path.read_text())
+
+    request = build_escalation_request(capture)
+
+    assert "txkxxxl1404r694dcmw2rzkh" in request
+    assert "200" in request
+    assert "poolside/Laguna-XS-2.1" in request
+    assert "same Hosted Training policy-inference image" in request
+    assert "underlying exception plus a correlation/request ID" in request
+
+
+def test_laguna_local_smoke_inputs_are_serializable_and_representative() -> None:
+    tool_defs = uav_operator._tool_defs()
+    validate_tool_defs(tool_defs)
+    messages = initial_messages()
+
+    assert len(tool_defs) == 17
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert messages[1]["content"].startswith("Mission briefing")
 
 
 def _load(path: Path) -> dict[str, object]:

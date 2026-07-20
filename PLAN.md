@@ -88,8 +88,8 @@ documented the required prerelease dependency flag; saved-state eval
 `407bb371` ran `openai/gpt-4.1-nano` for two examples with zero provider errors,
 and its saved `sim_log` rendered successfully from outside the repository.
 
-**Day 8 — free training-pipeline validation. BLOCKED BY FREE HOSTED TRAINING
-CATALOG/ELIGIBILITY.** Hosted Training's single TOML supersedes the
+**Day 8 — training-pipeline validation. PAID PATH AUTHORIZED 2026-07-19.**
+Hosted Training's single TOML supersedes the
 obsolete separate orchestrator/trainer/inference files and manual small-pod
 orchestration. This phase authorizes only models whose effective training,
 inference-input, and inference-output prices are all $0 immediately before
@@ -99,6 +99,20 @@ The inference model used to validate environment plumbing may differ from the
 Hosted Training model, but such runs prove integration only and cannot be used
 as evidence of learning or compared as a before/after pair.
 
+**Paid amendment (2026-07-19).** The user selected `Qwen/Qwen3.5-2B` to
+complete the model-dependent remainder under a strict `$10.00` aggregate
+credit budget. The first authorized action is the existing one-step plumbing
+gate adapted only to this paid model: one optimizer step, batch 16, two
+rollouts/example, four maximum in flight, eight T1 train rows, two T1 dev rows,
+20 turns, and 1,024 sampling tokens. Its purpose is to prove a healthy optimizer
+step and usable tool-calling rollouts before authorizing the 50-step smoke. The
+diagnostic stop/projection cap is `$0.20`; the diagnostic plus future 50-step
+smoke may not exceed `$3.75`; projected end-to-end spend may not exceed `$9.25`,
+reserving at least `$0.75` for frozen evaluation/recovery. Every later paid
+launch still requires refreshed pricing, measured-token projection, an exact
+command/workload, and separate explicit approval. Free-path failures remain
+preserved evidence and do not count against this paid budget.
+
 Day 8 has three ordered gates:
 
 1. **Environment/tool-loop gate — COMPLETE.** Saved eval `6d420fc1` ran two T1
@@ -107,22 +121,30 @@ Day 8 has three ordered gates:
    one 40-turn TFR loop (reward -1.3), zero provider errors, and zero reported
    cost. This proves the published environment can execute functional model
    rollouts. It does not prove that Hosted Training works or that reward rises.
-2. **One-step Hosted Training diagnostic — BLOCKED.** Use a model in the live
-   Hosted Training catalog that is still effectively free. The attempted
-   candidate was `sprints/Llama-3.2-1B-Instruct`, subject to availability,
-   capacity, exact model-ID/client compatibility, pricing, wallet, Hub
-   quality-action, and promotional-eligibility checks. Keep this diagnostic
-   deliberately small (one
-   training step, batch 16, two rollouts/example, at most four in flight) and
-   use a 20-turn cap to bound the looping behavior observed in the functional
-   eval. Passing requires one real optimizer step, finite metrics, retrievable
-   sampled rollouts, and zero cost.
-3. **Free 50-step T1 smoke — NOT LAUNCHED.** Only after the one-step diagnostic
-   passes, run a 50-step LoRA GRPO smoke on the same free, trainable model.
-   Include a pre-training baseline and evaluation every 10 steps on all 15 T1
-   dev rows, save checkpoints/adapters every 10 steps, and retain enough
-   sampled rollouts to diagnose context length, turn caps, reward collapse,
-   and tool use. No final-eval seed may be used.
+2. **One-step Hosted Training diagnostic — COMPUTE PASSED; ARTIFACT GATE OPEN.**
+   Paid run `vdl1vmihdlodgr88nqcqe2rq` completed on `Qwen/Qwen3.5-2B` at step 1
+   with 161,176 training tokens, finite metrics, retrievable rollouts, zero
+   provider errors, and `$0.15` total reported cost, within the `$0.20` cap.
+   Prime's orchestrator logged `Writing final checkpoint`, but the checkpoint
+   API still returned no checkpoint and no adapter-upload evidence was exposed.
+   This proves compatible rollout and optimizer plumbing, but not recoverable
+   artifact persistence.
+3. **Paid 25-step T1 smoke — COMPLETE.** Run `vhuh1or0bar3cht6ql0jzazs`
+   completed all 25 steps with zero provider/eval errors, 4,361,287 training
+   tokens, and `$2.2716` total cost. Held-out T1 dev reward moved from 0.2660
+   at step 0 to 0.4379 at step 25, with a non-monotonic step-10 collapse and
+   26.7% final truncation. READY checkpoints 15 and 20 are retained; the final
+   checkpoint is not exposed. The validated capture and curve are committed
+   under `assets/training/day8_qwen35_2b_t1_smoke_25.*`. No final-eval seed was
+   used.
+
+The diagnostic's actual token profile invalidates the original `$3.75`
+diagnostic-plus-smoke projection: it billed 4,137,545 inference tokens because
+multi-turn rollouts repeatedly resend growing context, plus a prefetched next
+training batch that was drained at shutdown. Do not linearly launch the
+existing 50-step workload. First reduce and re-diagnose the smoke workload or
+otherwise demonstrate from measured usage that the full remaining project
+still fits the aggregate `$10.00` cap and `$0.75` reserve.
 
 Re-check model availability/capacity, effective prices, wallet, and Hub quality
 action immediately before every launch. Present the exact command and expected
@@ -159,7 +181,7 @@ closed unless eligibility is affirmatively exposed. Evidence and analysis are
 in `assets/training/day8_llama_1b_diagnostic.json` and
 `docs/DAY8_FREE_TRAINING.md`. Do not launch the 50-step smoke.
 
-**Day 9 — free smoke-run postmortem + curriculum config.** Fix only what the
+**Day 9 — smoke-run postmortem + curriculum config. ACTIVE.** Fix only what the
 completed smoke's evidence shows (reward normalization, degenerate rollouts,
 turn caps, or curriculum difficulty). Decide T1→T2 versus mixed-from-start from
 that evidence and freeze the environment for the main run. No larger run may
@@ -177,11 +199,15 @@ zero-cost `poolside/laguna-m.1`. Use the committed two-row Laguna M.1 functional
 eval as the completed environment/tool-loop gate. Laguna M.1 is not in the
 Hosted Training catalog and cannot be substituted into the training TOML. That
 finding led to the separate free Llama diagnostic, which the backend denied on
-environment eligibility as recorded above. There is currently no authorized
-next candidate; absence from the ordinary inference catalog remains a
-compatibility risk to test, not grounds to switch to a paid model.
+environment eligibility as recorded above. The later paid Qwen amendment
+supersedes that historical free-path blocker. Before a main run, evaluate
+retained checkpoints 15 and 20 on identical frozen T1 dev seeds, select by
+held-out state-derived evidence, and use the observed truncation/curve to
+freeze the next curriculum. The checkpoint manifests are prepared under
+`outputs/training-evidence/vhuh1or0bar3cht6ql0jzazs/`; deployment and inference
+remain separate manual paid actions.
 
-### Blocked-mode parallel plan (active while Day 8 is unresolved)
+### Historical blocked-mode parallel plan (Day 8 is now unblocked)
 
 Day 8 blocks the project's training evidence, not the completed environment.
 The simulator, reward semantics, dataset seeds, public Hub package, functional

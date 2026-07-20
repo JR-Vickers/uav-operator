@@ -92,6 +92,38 @@ the bounded retry rule. If Prime repairs or rolls back the endpoint, the next
 attempt still starts at the committed one-step Laguna diagnostic with a fresh
 free-price, capacity, wallet, and Hub preflight plus explicit user approval.
 
+### 2026-07-19 retry result
+
+After `poolside/Laguna-XS-2.1` remained listed in the live Hosted Training
+catalog with zero effective training, input, and output prices, a user-launched
+one-step diagnostic was run as `txkxxxl1404r694dcmw2rzkh`. It stopped at step
+0 after roughly five minutes. The run recorded 200 dispatcher-level
+`ModelError` failures, zero training tokens, no sampled rollouts, no reward
+distributions, no checkpoint or adapter, and `$0.00` total reported cost. Both
+environment-server components completed successfully; no environment exception
+or more-specific provider stack trace was exposed. The captured run and fresh
+preflight are `assets/training/day8_laguna_t1_retry.json` and
+`assets/training/day8_laguna_t1_retry_preflight.json`.
+
+This is a reproduction of the platform policy-inference failure, not evidence
+that the model is trainable in this environment. Do not relaunch unchanged.
+The ready-to-send platform probe request is in `docs/LAGUNA_XS_PLATFORM_PROBE.md`.
+
+### Local prompt/renderer compatibility check
+
+The environment-side interface was checked without model weights or another
+Hosted Training run. Laguna's official tokenizer rendered the real initial T1
+prompt plus all 17 tool definitions in 1,671 tokens, below the run's 65,536
+token sequence limit. A synthetic OpenAI-style tool call (JSON-string
+arguments) and tool result rendered in 1,699 tokens through the current public
+Prime `renderers` checkout (`983901a`). The renderer explicitly converts those
+JSON-string arguments to the structured form required by Laguna's native chat
+template.
+
+This rules out the current public renderer plus this environment's initial
+prompt/tool schema as the observed failure. It does not prove the private
+Hosted Training image used the same renderer/model/tokenizer revisions.
+
 ## Work while blocked
 
 The active dependency plan is in `PLAN.md` under “Blocked-mode parallel plan.”
