@@ -1,5 +1,31 @@
 # HANDOFF.md
 
+## 2026-07-21 Phase B routing recovery retry
+
+- Both exact adapters remained READY/DEPLOYED and present in the inference
+  catalog. A fresh sequential A/B probe succeeded 10/10 per adapter (20/20
+  total); every response ID ended in `-SIN`, and reported probe cost was
+  `$0.0020`.
+- The unchanged frozen Phase B exact evaluation completed 24/24 rows as run
+  `e6136883`, with zero provider errors, complete seeds 10000--10023, saved
+  `sim_state`/`sim_log`, finite rewards, zero hard-safety penalties, and
+  `$0.2942734` cost within the `$0.35` ceiling.
+- The retry still fails the scientific gate: T3 had 4/6 max-turn truncations
+  (66.7%), above the frozen per-tier 50% ceiling. T0/T1/T2 truncation was
+  0/6, 3/6, and 3/6. Mean reward was `0.22595`, with 10/24 completions. The
+  earlier provider-failed runs remain invalid evidence.
+- Normalized evidence is `outputs/main-training/phase-b/exact-step-40-retry.json`;
+  raw results are under the adapter's `outputs/evals/.../e6136883/` directory.
+- The full capture wrapper currently fails because the installed Prime CLI
+  rejects its stale `train rollouts --output json` flag. This did not affect
+  the completed evaluation or direct exact-row audit.
+
+Next action:
+
+- Preserve Phase B as scientifically failed and do not prepare Phase C under
+  the frozen decision tree. Update the capture wrapper for the current Prime
+  CLI before the next metadata capture workflow.
+
 ## 2026-07-20 Phase B exact-adapter validation preparation
 
 Result update:

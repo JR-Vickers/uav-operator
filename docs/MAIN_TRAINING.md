@@ -164,6 +164,16 @@ User-requested retry `eb93c282` reproduced two provider 404s within its first
 four rows and was stopped at `$0.0083627`; cumulative metadata cost across the
 two attempts is `$0.0515559`. This does not reopen the scientific gate.
 
+On 2026-07-21 both deployed adapters passed a fresh 10-request sequential probe
+(20/20 total, all response IDs routed through `SIN`, `$0.0020` reported cost).
+The unchanged Phase B workload was retried as `e6136883` and completed all 24
+rows with zero provider errors for `$0.2942734`. Routing had recovered, but the
+frozen scientific gate still failed: T3 reached 4/6 max-turn truncations
+(66.7%), above the per-tier 50% ceiling. T0/T1/T2 were 0/6, 3/6, and 3/6;
+all tiers had zero hard-safety penalties. This is a behavioral gate failure,
+not retroactive validation of `bfa67b49` or `eb93c282`, and it does not
+authorize Phase C.
+
 Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
 `ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment
 containers before a different eval slot failed. Both ended at zero steps,

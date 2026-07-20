@@ -213,6 +213,12 @@ not a passing scientific result and Phase C remains blocked. See the
 An identical retry reproduced two provider 404s in its first four rows, making
 the failure repeatable across evaluation attempts; cumulative metadata cost was
 `$0.0516`.
+A later routing-health retry found both Phase A and Phase B adapters healthy
+(10/10 sequential requests each). Phase B exact eval `e6136883` then completed
+24/24 rows with zero provider errors and zero hard-safety penalties, but still
+failed the frozen behavioral gate because T3 max-turn truncation was 4/6
+(66.7%). The clean retry distinguishes recovered platform routing from model
+readiness; Phase C remains unauthorized.
 
 ## Documentation
 
