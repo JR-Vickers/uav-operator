@@ -1,5 +1,33 @@
 # HANDOFF.md
 
+## 2026-07-20 recovery branch prepared; no paid run launched
+
+- Phase A step 30 is preserved as failed evidence and is ineligible as a
+  training parent or final winner. The committed recovery artifact classifies
+  its eight T2/T3 truncations as seven ground/pending stalls and one airborne
+  holding stall; repeated planning, polling, holds, route amendments, and
+  no-tool-call turns explain the unchanged 20-turn gate.
+- Phase B now runs 20 updates from smoke run `vhuh1or0bar3cht6ql0jzazs`, exact
+  READY step-20 checkpoint `g1akido7qfo58e3my36wnqrz`, to global step 40 at
+  40% T1 / 60% T2. Phase C runs step 40→60 at 25% T1 / 45% T2 / 30% T3 only
+  after a passing deterministic exact-step-40 capture.
+- The ledger permanently includes `$3.0469` existing evidence and
+  `$1.4739461` failed Phase A sunk cost. Hard commitments are `$13.0208461`,
+  leaving `$1.9791539` below the `$15` cap.
+- Hosted training safety events remain diagnostics. Passing gates require a
+  24-row deterministic exact-checkpoint T0–T3 evaluation with finite rewards,
+  saved sim state/logs, no provider/cancellation/safety failures, and no tier
+  above 50% truncation. Mixed-policy milestone results cannot substitute.
+
+Next action:
+
+- Live preparation failed closed. Qwen3.5-2B is available and the smoke
+  run/checkpoint, `$54.0405` wallet, and Hub `0.1.1` status all pass, but live
+  prices `$0.15/$0.05/$0.15` per M tokens project Phase B at `$2.8825`, above
+  its `$2.35` ceiling. No launch bundle or authorization was emitted. Reprice,
+  reduce the authorized workload, or explicitly revise accounting before
+  preparing again; do not silently consume reserve headroom.
+
 ## 2026-07-20 Phase A exact-checkpoint review
 
 - Phase A run `r6n3cud398dkrhnsoqwxpsjk` completed global steps 20-30 from

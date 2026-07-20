@@ -1,8 +1,8 @@
 # Main training protocol
 
-This protocol prepares **50 additional warm-started updates** from selected
+This recovery protocol prepares **40 additional warm-started updates** from selected
 smoke checkpoint `g1akido7qfo58e3my36wnqrz`. It does not describe one
-uninterrupted 70-step optimizer trajectory: `checkpoint_id` proves weight
+uninterrupted 60-step optimizer trajectory: `checkpoint_id` proves weight
 warm-start provenance, but optimizer-state restoration must not be claimed
 unless later platform metadata explicitly proves it.
 
@@ -14,9 +14,8 @@ be prepared. The tool never launches training itself.
 
 | Phase | Updates | Training rows | Input | Eval | Retention |
 |---|---:|---|---|---|---|
-| A | 10 (global 20→30) | 100% T1 | smoke step 20 | T0–T3 at 20, 30 | steps 25, 30 |
-| B | 20 (global 30→50) | 40% T1 / 60% T2 | Phase-A final READY checkpoint | T0–T3 at 30, 40, 50 | steps 40, 50 |
-| C | 20 (global 50→70) | 25% T1 / 45% T2 / 30% T3 | Phase-B final READY checkpoint | T0–T3 at 50, 60, 70 | steps 60, 70 |
+| B | 20 (global 20→40) | 40% T1 / 60% T2 | smoke step 20 | T0–T3 at 20, 30, 40 | steps 30, 40 |
+| C | 20 (global 40→60) | 25% T1 / 45% T2 / 30% T3 | passing Phase-B step 40 | T0–T3 at 40, 50, 60 | steps 50, 60 |
 
 Every training tier is its own `[[env]]` using
 `jarrett/uav-operator@0.1.1`, the deterministic `train` split, 75 rows, and a
@@ -33,8 +32,8 @@ Training entries use unique names such as `train_t1`; evaluation entries use
 unless each entry has a unique name.
 
 Prime interprets Hosted Training `max_steps` as an absolute global target when
-warm-starting. Therefore the three TOMLs use `max_steps = 30`, `50`, and `70`;
-these still represent 10, 20, and 20 additional updates respectively. An
+warm-starting. Therefore the recovery TOMLs use `max_steps = 40` and `60`;
+these represent 20 and 20 additional updates respectively. An
 initial Phase-A launch attempt with `max_steps = 10` was rejected by the API
 before run creation or billing, which supplied this platform evidence.
 
@@ -43,15 +42,15 @@ before run creation or billing, which supplied this platform evidence.
 | Item | Expected | Hard ceiling |
 |---|---:|---:|
 | Existing diagnostic, smoke, and checkpoint comparison | $3.0469 | $3.0469 |
-| Phase A | $1.45 | $1.50 |
+| Failed Phase A including clean validation (sunk) | $1.4739461 | $1.4739461 |
 | Phase B | $1.90 | $2.35 |
 | Phase C | $1.95 | $2.40 |
 | Post-training dev comparison | reserved | $1.75 |
 | T2/T3 red-team | reserved | $0.75 |
 | Frozen final evaluation | reserved | $1.25 |
 
-Expected total is `$12.0969`; the sum of all hard ceilings is `$13.0469`,
-leaving `$1.9531` below the aggregate `$15.00` cap. A pricing change recomputes
+Expected total is `$12.1208461`; hard commitments total `$13.0208461`,
+leaving `$1.9791539` below the aggregate `$15.00` cap. A pricing change recomputes
 the phase projection from the paid smoke's measured tokens. It cannot silently
 consume the unallocated amount. Missing pricing, capacity, wallet, Hub status,
 or billing evidence fails closed.
@@ -70,7 +69,7 @@ pricing/capacity, wallet, and Hub status, then writes `train.toml`, a SHA-256
 manifest, usage projection, stop limits, and the exact manual launch command.
 
 ```bash
-uv run python scripts/main_training.py prepare A
+uv run python scripts/main_training.py prepare B
 ```
 
 After reviewing the bundle and receiving separate approval, the operator runs
@@ -78,18 +77,16 @@ the manifest's `manual_launch_command`. The command is never executed by
 `main_training.py`. Capture the completed phase with:
 
 ```bash
-uv run python scripts/main_training.py capture A RUN_ID \
-  --manifest outputs/main-training/phase-a/manifest.json
+uv run python scripts/main_training.py capture B RUN_ID \
+  --manifest outputs/main-training/phase-b/manifest.json \
+  --exact-evaluation outputs/main-training/phase-b/exact-step-40.json
 ```
 
 Only a passing capture is promoted to
-`assets/training/main_phase_a.json` and its curve to
-`assets/training/main_phase_a_curve.png`. Phase B and C add the predecessor
-gate:
+`assets/training/main_phase_b.json` and its curve to
+`assets/training/main_phase_b_curve.png`. Phase C adds the predecessor gate:
 
 ```bash
-uv run python scripts/main_training.py prepare B \
-  --predecessor-capture assets/training/main_phase_a.json
 uv run python scripts/main_training.py prepare C \
   --predecessor-capture assets/training/main_phase_b.json
 uv run python scripts/main_training.py budget assets/training/main_phase_*.json
@@ -135,16 +132,23 @@ clean exact-adapter T0-T3 validation cost `$0.2781461`; total Phase A cost
 The capture failed the preregistered truncation gate. T2 and T3 each reached
 the 20-turn limit in 4/6 episodes (66.7%). T0 and T1 had 0/6 and 2/6 max-turn
 stops. All 24 evaluations completed with saved simulator state/logs, zero
-provider errors, and zero hard-safety penalties. Phase B is withheld. See
-`assets/training/main_phase_a_exact_step30.json`.
+provider errors, and zero hard-safety penalties. Forensics classify the eight
+T2/T3 truncations as seven ground/pending stalls and one airborne holding
+stall, with repeated planning, polling, holding, route amendment, and
+no-tool-call behavior. Phase A and its step-23 training safety event remain
+diagnostic evidence, but step 30 is abandoned as a parent. No simulator,
+reward, prompt, dataset, or turn-limit change was made. See
+`assets/training/main_phase_a_exact_step30.json` and
+`assets/training/main_phase_a_recovery_decision.json`.
 
 ## Post-Phase-C selection
 
-Deploy the smoke-step-20 and Phase-A/B/C checkpoints. Evaluate all four on
+Deploy smoke step 20, failed Phase A step 30, Phase B step 40, and Phase C step
+60. Evaluate all four on
 identical T1–T3 dev workloads: six seeds per tier, two rollouts per seed,
 temperature 0, 20 turns, no retries, and saved `sim_state`/`sim_log`. Report
-paired-seed results. The smoke checkpoint is a before-training reference only;
-the winner is selected among A/B/C by fewer hard-safety violations, higher
+paired-seed results. Smoke and failed Phase A are references only; the winner
+is selected only among passing Phase B and C by fewer hard-safety violations, higher
 mean reward, more completions, then fewer max-turn truncations.
 
 Run the existing T2/T3 adversarial protocol on the selected winner. Only after

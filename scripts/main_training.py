@@ -24,6 +24,8 @@ SMOKE_RUN_ID = "vhuh1or0bar3cht6ql0jzazs"
 SMOKE_STEP = 20
 SMOKE_CHECKPOINT_ID = "g1akido7qfo58e3my36wnqrz"
 EXISTING_EVIDENCE_COST_USD = 3.0469
+FAILED_PHASE_A_COST_USD = 1.4739461
+RECOVERY_DECISION = ASSET_ROOT / "main_phase_a_recovery_decision.json"
 AGGREGATE_CEILING_USD = 15.0
 RESERVED_COSTS_USD = {
     "post_training_dev_comparison": 1.75,
@@ -50,11 +52,10 @@ class Phase:
 
 
 PHASES = {
-    "A": Phase("A", 20, 10, (("T1", 1.0),), 5, 1.45, 1.50, None),
-    "B": Phase("B", 30, 20, (("T1", 0.4), ("T2", 0.6)), 10, 1.90, 2.35, "A"),
+    "B": Phase("B", 20, 20, (("T1", 0.4), ("T2", 0.6)), 10, 1.90, 2.35, None),
     "C": Phase(
         "C",
-        50,
+        40,
         20,
         (("T1", 0.25), ("T2", 0.45), ("T3", 0.30)),
         10,
@@ -286,10 +287,33 @@ def _load_capture(path: Path, phase_name: str) -> dict[str, Any]:
     return artifact
 
 
+def validate_recovery_decision(path: Path | None = None) -> dict[str, Any]:
+    path = path or RECOVERY_DECISION
+    if not path.is_file():
+        raise ValueError(f"committed recovery decision is required: {path}")
+    artifact = json.loads(path.read_text())
+    required = {
+        "status": "ABANDONED_AS_PARENT",
+        "failed_phase": "A",
+        "failed_global_step": 30,
+        "replacement_parent_run_id": SMOKE_RUN_ID,
+        "replacement_parent_checkpoint_id": SMOKE_CHECKPOINT_ID,
+        "replacement_parent_step": SMOKE_STEP,
+    }
+    if any(artifact.get(key) != value for key, value in required.items()):
+        raise ValueError("recovery decision provenance is invalid")
+    classification = artifact.get("forensics", {}).get("classification_counts", {})
+    if classification != {"airborne_holding_stall": 1, "ground_pending_stall": 7}:
+        raise ValueError("recovery forensic classification is invalid")
+    if artifact.get("phase_a_total_cost_usd") != FAILED_PHASE_A_COST_USD:
+        raise ValueError("failed Phase-A cost is missing from recovery decision")
+    return artifact
+
+
 def resolve_input(
     phase: Phase, predecessor_capture: Path | None
 ) -> tuple[str, str, int]:
-    if phase.predecessor is None:
+    if phase.name == "B":
         return SMOKE_CHECKPOINT_ID, SMOKE_RUN_ID, SMOKE_STEP
     if predecessor_capture is None:
         raise ValueError(f"Phase-{phase.predecessor} capture is required")
@@ -372,11 +396,13 @@ def budget(
             failures.append(f"Phase-{name} projection exceeds its hard ceiling")
     total = (
         EXISTING_EVIDENCE_COST_USD
+        + FAILED_PHASE_A_COST_USD
         + sum(remaining_phases.values())
         + sum(RESERVED_COSTS_USD.values())
     )
     hard_ceiling_total = (
         EXISTING_EVIDENCE_COST_USD
+        + FAILED_PHASE_A_COST_USD
         + sum(p.hard_ceiling_usd for p in PHASES.values())
         + sum(RESERVED_COSTS_USD.values())
     )
@@ -388,6 +414,7 @@ def budget(
         "passed": not failures,
         "failures": failures,
         "existing_evidence_usd": EXISTING_EVIDENCE_COST_USD,
+        "failed_phase_a_sunk_cost_usd": FAILED_PHASE_A_COST_USD,
         "phase_costs_usd": remaining_phases,
         "reserved_costs_usd": RESERVED_COSTS_USD,
         "projected_total_usd": total,
@@ -404,7 +431,10 @@ def prepare(
     predecessor_capture: Path | None = None,
     fixture_dir: Path | None = None,
 ) -> dict[str, Any]:
+    if phase_name == "A":
+        raise ValueError("Phase A is abandoned and cannot be prepared")
     phase = PHASES[phase_name]
+    recovery = validate_recovery_decision()
     checkpoint_id, source_run_id, source_step = resolve_input(
         phase, predecessor_capture
     )
@@ -478,6 +508,11 @@ def prepare(
             "status": checkpoint["status"],
             "model": MODEL,
         },
+        "recovery_decision": {
+            "path": str(RECOVERY_DECISION.relative_to(REPO_ROOT)),
+            "sha256": _sha256(RECOVERY_DECISION.read_bytes()),
+            "status": recovery["status"],
+        },
         "pricing_usd_per_mtok": pricing,
         "wallet": wallet,
         "hub_status": hub,
@@ -512,6 +547,7 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     progress = artifact.get("progress", {})
     metrics = _metric_rows(artifact.get("metrics", {}))
     samples = artifact.get("samples_by_step", {})
+    exact = artifact.get("exact_checkpoint_evaluation", {})
     checkpoints = _rows(artifact.get("checkpoints", {}), "checkpoints")
     adapters = [
         row
@@ -555,45 +591,57 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     }
     if eval_steps != expected_eval_steps:
         failures.append("evaluation milestones are incomplete")
-    provider_errors = 0
-    cancelled = 0
-    truncation_by_step: dict[str, dict[str, int | float]] = {}
-    safety_penalties = 0
+    training_safety_events = 0
     for step, payload in samples.items() if isinstance(samples, dict) else []:
         rows = _rows(payload, "samples", "rollouts")
-        truncated = 0
         for row in rows:
-            if row.get("provider_error") or row.get("error"):
-                provider_errors += 1
-            if str(row.get("status", "")).upper() == "CANCELLED":
-                cancelled += 1
-            if (
-                row.get("stop_condition") == "max_turns_reached"
-                or row.get("is_truncated") is True
-            ):
-                truncated += 1
             hard = (
                 row.get("metrics", {}).get("hard_safety", 0)
                 if isinstance(row.get("metrics"), dict)
                 else 0
             )
             if isinstance(hard, (int, float)) and hard < 0:
+                training_safety_events += 1
+    provider_errors = 0
+    cancelled = 0
+    safety_penalties = 0
+    truncation_by_tier: dict[str, dict[str, int | float]] = {}
+    exact_rows = _rows(exact, "rows", "samples", "rollouts")
+    if exact.get("checkpoint_step") != final_step or exact.get("policy") != "exact_checkpoint":
+        failures.append("deterministic exact-checkpoint evaluation is unavailable")
+    if exact.get("temperature") != 0 or exact.get("hosted_milestone") is True:
+        failures.append("mixed-policy hosted milestone is not final checkpoint evidence")
+    if len(exact_rows) != 24:
+        failures.append("exact-checkpoint evaluation row coverage is incomplete")
+    for tier in ("T0", "T1", "T2", "T3"):
+        tier_rows = [row for row in exact_rows if row.get("tier") == tier]
+        truncated = 0
+        for row in tier_rows:
+            if row.get("provider_error") or row.get("error"):
+                provider_errors += 1
+            if str(row.get("status", "")).upper() == "CANCELLED":
+                cancelled += 1
+            if not isinstance(row.get("sim_state"), dict) or not isinstance(row.get("sim_log"), list):
+                failures.append("exact-checkpoint state/log evidence is missing")
+            try:
+                _finite(row.get("reward"), "exact-checkpoint reward")
+            except ValueError as exc:
+                failures.append(str(exc))
+            if row.get("stop_condition") == "max_turns_reached" or row.get("is_truncated") is True:
+                truncated += 1
+            hard = row.get("metrics", {}).get("hard_safety", 0) if isinstance(row.get("metrics"), dict) else 0
+            if isinstance(hard, (int, float)) and hard < 0:
                 safety_penalties += 1
-        truncation_by_step[str(step)] = {
-            "count": truncated,
-            "n": len(rows),
-            "rate": truncated / len(rows) if rows else 0.0,
-        }
+        truncation_by_tier[tier] = {"count": truncated, "n": len(tier_rows), "rate": truncated / len(tier_rows) if tier_rows else 0.0}
     if provider_errors:
         failures.append("provider errors are nonzero")
     if cancelled:
         failures.append("cancelled rows are nonzero")
     if safety_penalties:
         failures.append("hard-safety penalty is positive in magnitude")
-    for step in expected_eval_steps:
-        summary = truncation_by_step.get(str(step))
-        if summary and summary["rate"] > 0.5:
-            failures.append(f"evaluation truncation exceeds 50% at step {step}")
+    for tier, summary in truncation_by_tier.items():
+        if summary["rate"] > 0.5:
+            failures.append(f"exact-checkpoint truncation exceeds 50% for {tier}")
     retained_steps = sorted(
         row.get("step") for row in checkpoints if row.get("status") == "READY"
     )
@@ -631,7 +679,8 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         "provider_errors": provider_errors,
         "cancelled_rows": cancelled,
         "hard_safety_penalties": safety_penalties,
-        "truncation_by_step": truncation_by_step,
+        "training_hard_safety_events_diagnostic": training_safety_events,
+        "truncation_by_tier": truncation_by_tier,
         "ready_checkpoint_steps": retained_steps,
         "ready_adapter_steps": adapter_steps,
         "final_checkpoint": final_matches[0] if len(final_matches) == 1 else None,
@@ -644,6 +693,7 @@ def capture(
     manifest_path: Path,
     output: Path,
     plot: Path,
+    exact_evaluation_path: Path,
     fixture_dir: Path | None = None,
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text())
@@ -653,6 +703,11 @@ def capture(
     config_bytes = config_path.read_bytes()
     if _sha256(config_bytes) != manifest.get("config_sha256"):
         raise ValueError("prepared config hash mismatch")
+    if not exact_evaluation_path.is_file():
+        raise ValueError("deterministic exact-checkpoint evaluation is required")
+    exact_evaluation = json.loads(exact_evaluation_path.read_text())
+    if not isinstance(exact_evaluation, dict):
+        raise ValueError("exact-checkpoint evaluation must be an object")
 
     def fetch(name: str, args: Sequence[str]) -> dict[str, Any]:
         return _fixture_or_live(fixture_dir, name, args)
@@ -693,6 +748,7 @@ def capture(
         ),
         "adapters": fetch("adapters", ["train", "models", "--output", "json"]),
         "samples_by_step": samples,
+        "exact_checkpoint_evaluation": exact_evaluation,
         "content_policy": "No model prose is judged; all gates use platform status and simulator-derived metrics.",
     }
     artifact["summary"] = validate_capture(artifact)
@@ -759,9 +815,12 @@ def plot_curve(artifact: Mapping[str, Any], output: Path) -> None:
 
 
 def select_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    eligible = [row for row in candidates if row.get("phase") in PHASES]
-    if {row.get("phase") for row in eligible} != set(PHASES):
-        raise ValueError("Phase A/B/C candidate coverage is incomplete")
+    required = {"smoke", "failed_A", "B", "C"}
+    if {row.get("phase") for row in candidates} != required:
+        raise ValueError("smoke/failed-A/Phase-B/Phase-C candidate coverage is incomplete")
+    eligible = [row for row in candidates if row.get("phase") in {"B", "C"} and row.get("passed") is True]
+    if not eligible:
+        raise ValueError("no passing Phase B or C candidate is eligible")
     seeds = [set(row.get("paired_seeds", [])) for row in candidates]
     if not seeds or any(seed_set != seeds[0] for seed_set in seeds[1:]):
         raise ValueError("candidate paired-seed coverage differs")
@@ -778,9 +837,7 @@ def select_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, Any]
     return {
         "winner": dict(winner),
         "eligible_phases": sorted(row["phase"] for row in eligible),
-        "smoke_is_reference_only": any(
-            row.get("phase") == "smoke" for row in candidates
-        ),
+        "reference_only_phases": ["smoke", "failed_A"],
         "selection_rule": "fewer hard-safety violations; higher mean reward; more completions; fewer max-turn truncations",
     }
 
@@ -799,6 +856,7 @@ def main() -> None:
     capture_parser.add_argument("--manifest", required=True, type=Path)
     capture_parser.add_argument("--output", type=Path)
     capture_parser.add_argument("--plot", type=Path)
+    capture_parser.add_argument("--exact-evaluation", required=True, type=Path)
     capture_parser.add_argument("--fixture-dir", type=Path)
     budget_parser = sub.add_parser("budget")
     budget_parser.add_argument("captures", nargs="*", type=Path)
@@ -817,6 +875,7 @@ def main() -> None:
             args.manifest,
             args.output or ASSET_ROOT / f"main_phase_{args.phase.lower()}.json",
             args.plot or ASSET_ROOT / f"main_phase_{args.phase.lower()}_curve.png",
+            args.exact_evaluation,
             args.fixture_dir,
         )
     else:

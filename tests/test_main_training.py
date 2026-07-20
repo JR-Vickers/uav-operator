@@ -86,7 +86,7 @@ def _passing_predecessor(
     return path
 
 
-@pytest.mark.parametrize("phase_name", ["A", "B", "C"])
+@pytest.mark.parametrize("phase_name", ["B", "C"])
 def test_phase_configs_are_exact_and_use_only_train_dev(phase_name: str) -> None:
     phase = main.PHASES[phase_name]
     config = tomllib.loads(main.phase_toml(phase, "checkpoint"))
@@ -191,15 +191,15 @@ def test_training_and_dev_views_are_deterministic_and_final_eval_is_disjoint() -
         )
 
 
-def test_prepare_a_writes_hashed_manual_only_bundle(tmp_path: Path) -> None:
+def test_prepare_b_writes_hashed_manual_only_bundle(tmp_path: Path) -> None:
     fixtures = _prepare_fixtures(
         tmp_path / "fixtures",
-        "A",
+        "B",
         main.SMOKE_CHECKPOINT_ID,
         main.SMOKE_RUN_ID,
         main.SMOKE_STEP,
     )
-    artifact = main.prepare("A", tmp_path / "bundle", fixture_dir=fixtures)
+    artifact = main.prepare("B", tmp_path / "bundle", fixture_dir=fixtures)
     config = tomllib.loads((tmp_path / "bundle" / "train.toml").read_text())
     assert artifact["status"] == "awaiting_explicit_manual_launch_approval"
     assert artifact["input_provenance"] == {
@@ -218,6 +218,22 @@ def test_prepare_a_writes_hashed_manual_only_bundle(tmp_path: Path) -> None:
     assert "optimizer-state restoration is not claimed" in artifact["description"]
 
 
+def test_prepare_a_is_disabled(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="abandoned"):
+        main.prepare("A", tmp_path)
+
+
+def test_recovery_decision_is_required_and_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    artifact = main.validate_recovery_decision()
+    assert artifact["forensics"]["classification_counts"] == {
+        "airborne_holding_stall": 1,
+        "ground_pending_stall": 7,
+    }
+    monkeypatch.setattr(main, "RECOVERY_DECISION", tmp_path / "missing.json")
+    with pytest.raises(ValueError, match="recovery decision"):
+        main.validate_recovery_decision()
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [("id", "wrong", "run/model"), ("base_model", "wrong", "run/model")],
@@ -226,13 +242,13 @@ def test_prepare_rejects_wrong_source_run_or_model(
     tmp_path: Path, field: str, value: str, message: str
 ) -> None:
     fixtures = _prepare_fixtures(
-        tmp_path / "fixtures", "A", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
+        tmp_path / "fixtures", "B", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
     )
     payload = json.loads((fixtures / "source_run.json").read_text())
     payload["run"][field] = value
     _write(fixtures / "source_run.json", payload)
     with pytest.raises(ValueError, match=message):
-        main.prepare("A", tmp_path / "out", fixture_dir=fixtures)
+        main.prepare("B", tmp_path / "out", fixture_dir=fixtures)
 
 
 @pytest.mark.parametrize(
@@ -248,27 +264,27 @@ def test_prepare_rejects_checkpoint_provenance(
     tmp_path: Path, field: str, value: Any, message: str
 ) -> None:
     fixtures = _prepare_fixtures(
-        tmp_path / "fixtures", "A", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
+        tmp_path / "fixtures", "B", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
     )
     payload = json.loads((fixtures / "source_checkpoints.json").read_text())
     payload["checkpoints"][0][field] = value
     _write(fixtures / "source_checkpoints.json", payload)
     with pytest.raises(ValueError, match=message):
-        main.prepare("A", tmp_path / "out", fixture_dir=fixtures)
+        main.prepare("B", tmp_path / "out", fixture_dir=fixtures)
 
 
-def test_prepare_b_requires_passing_a_and_exact_final_checkpoint(
+def test_prepare_c_requires_passing_b_and_exact_final_checkpoint(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(ValueError, match="Phase-A capture is required"):
-        main.resolve_input(main.PHASES["B"], None)
-    path = _passing_predecessor(tmp_path / "a.json", "A", "run-a", "checkpoint-a")
-    assert main.resolve_input(main.PHASES["B"], path) == ("checkpoint-a", "run-a", 30)
+    with pytest.raises(ValueError, match="Phase-B capture is required"):
+        main.resolve_input(main.PHASES["C"], None)
+    path = _passing_predecessor(tmp_path / "b.json", "B", "run-b", "checkpoint-b")
+    assert main.resolve_input(main.PHASES["C"], path) == ("checkpoint-b", "run-b", 40)
     payload = json.loads(path.read_text())
     payload["summary"]["passed"] = False
     _write(path, payload)
     with pytest.raises(ValueError, match="has not passed"):
-        main.resolve_input(main.PHASES["B"], path)
+        main.resolve_input(main.PHASES["C"], path)
 
 
 @pytest.mark.parametrize(
@@ -284,7 +300,7 @@ def test_prepare_fails_closed_on_live_gates(
     tmp_path: Path, mutation: str, message: str
 ) -> None:
     fixtures = _prepare_fixtures(
-        tmp_path / "fixtures", "A", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
+        tmp_path / "fixtures", "B", main.SMOKE_CHECKPOINT_ID, main.SMOKE_RUN_ID, 20
     )
     if mutation == "capacity":
         payload = json.loads((fixtures / "models.json").read_text())
@@ -305,10 +321,10 @@ def test_prepare_fails_closed_on_live_gates(
             },
         )
     with pytest.raises(ValueError, match=message):
-        main.prepare("A", tmp_path / "out", fixture_dir=fixtures)
+        main.prepare("B", tmp_path / "out", fixture_dir=fixtures)
 
 
-def _capture_artifact(phase_name: str = "A") -> dict[str, Any]:
+def _capture_artifact(phase_name: str = "B") -> dict[str, Any]:
     phase = main.PHASES[phase_name]
     final_step = phase.start_step + phase.steps
     metrics = [
@@ -369,6 +385,24 @@ def _capture_artifact(phase_name: str = "A") -> dict[str, Any]:
             ]
         },
         "usage": {"total_cost_usd": phase.expected_cost_usd},
+        "exact_checkpoint_evaluation": {
+            "policy": "exact_checkpoint",
+            "checkpoint_step": final_step,
+            "temperature": 0,
+            "hosted_milestone": False,
+            "rows": [
+                {
+                    "tier": tier,
+                    "reward": 0.2,
+                    "stop_condition": "has_final_env_response",
+                    "metrics": {"hard_safety": 0},
+                    "sim_state": {"mission": {"status": "completed"}},
+                    "sim_log": [{}],
+                }
+                for tier in ("T0", "T1", "T2", "T3")
+                for _ in range(6)
+            ],
+        },
     }
     return artifact
 
@@ -377,7 +411,7 @@ def test_capture_validation_accepts_complete_phase_and_final_checkpoint() -> Non
     artifact = _capture_artifact()
     summary = main.validate_capture(artifact)
     assert summary["passed"] is True
-    assert summary["final_checkpoint"]["id"] == "cp-30"
+    assert summary["final_checkpoint"]["id"] == "cp-40"
 
 
 @pytest.mark.parametrize(
@@ -409,20 +443,20 @@ def test_capture_gates_fail_closed(mutation: str, failure: str) -> None:
         artifact["metrics"]["metrics"] = [
             row
             for row in artifact["metrics"]["metrics"]
-            if not (row["step"] == 30 and any(str(k).startswith("eval/") for k in row))
+            if not (row["step"] == 40 and any(str(k).startswith("eval/") for k in row))
         ]
     elif mutation == "checkpoint":
         artifact["checkpoints"]["checkpoints"].pop()
     elif mutation == "adapter":
         artifact["adapters"]["models"].pop()
     elif mutation == "provider":
-        artifact["samples_by_step"]["20"]["samples"][0]["provider_error"] = "bad"
+        artifact["exact_checkpoint_evaluation"]["rows"][0]["provider_error"] = "bad"
     elif mutation == "cancelled":
-        artifact["samples_by_step"]["20"]["samples"][0]["status"] = "CANCELLED"
+        artifact["exact_checkpoint_evaluation"]["rows"][0]["status"] = "CANCELLED"
     elif mutation == "safety":
-        artifact["samples_by_step"]["20"]["samples"][0]["metrics"]["hard_safety"] = -5
+        artifact["exact_checkpoint_evaluation"]["rows"][0]["metrics"]["hard_safety"] = -5
     elif mutation == "truncation":
-        for row in artifact["samples_by_step"]["20"]["samples"][:4]:
+        for row in artifact["exact_checkpoint_evaluation"]["rows"][:4]:
             row["stop_condition"] = "max_turns_reached"
     elif mutation == "cost":
         artifact["usage"]["total_cost_usd"] = 99
@@ -441,22 +475,35 @@ def test_capture_rejects_non_finite_metric() -> None:
     )
 
 
+@pytest.mark.parametrize("mutation", ["missing_state", "non_finite_reward", "mixed_policy"])
+def test_exact_checkpoint_evidence_fails_closed(mutation: str) -> None:
+    artifact = _capture_artifact()
+    row = artifact["exact_checkpoint_evaluation"]["rows"][0]
+    if mutation == "missing_state":
+        row.pop("sim_log")
+    elif mutation == "non_finite_reward":
+        row["reward"] = float("nan")
+    else:
+        artifact["exact_checkpoint_evaluation"]["hosted_milestone"] = True
+    assert main.validate_capture(artifact)["passed"] is False
+
+
 def test_budget_ledger_and_billing_reconciliation_failures(tmp_path: Path) -> None:
-    assert main.budget([])["projected_total_usd"] == pytest.approx(12.0969)
-    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.0469)
+    assert main.budget([])["projected_total_usd"] == pytest.approx(12.1208461)
+    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.0208461)
     assert main.budget([])["unallocated_after_hard_ceilings_usd"] == pytest.approx(
-        1.9531
+        1.9791539
     )
     capture = tmp_path / "a.json"
-    _write(capture, {"phase": "A", "summary": {"passed": True, "run_cost_usd": 1.51}})
+    _write(capture, {"phase": "B", "summary": {"passed": True, "run_cost_usd": 2.36}})
     with pytest.raises(ValueError, match="ceiling breached"):
         main.budget([capture])
     with pytest.raises(ValueError, match="unavailable"):
-        main.budget([], {"A": None})
-    assert main.budget([], {"A": 4.0})["passed"] is False
+        main.budget([], {"B": None})
+    assert main.budget([], {"B": 4.0})["passed"] is False
 
 
-def test_candidate_selection_is_paired_and_smoke_is_ineligible() -> None:
+def test_candidate_selection_is_paired_and_references_are_ineligible() -> None:
     rows = [
         {
             "phase": "smoke",
@@ -467,12 +514,13 @@ def test_candidate_selection_is_paired_and_smoke_is_ineligible() -> None:
             "max_turn_truncations": 0,
         },
         {
-            "phase": "A",
+            "phase": "failed_A",
             "paired_seeds": [1, 2],
             "hard_safety_violations": 0,
             "mean_reward": 0.5,
             "completions": 5,
             "max_turn_truncations": 2,
+            "passed": False,
         },
         {
             "phase": "B",
@@ -481,6 +529,7 @@ def test_candidate_selection_is_paired_and_smoke_is_ineligible() -> None:
             "mean_reward": 1.0,
             "completions": 8,
             "max_turn_truncations": 0,
+            "passed": True,
         },
         {
             "phase": "C",
@@ -489,12 +538,13 @@ def test_candidate_selection_is_paired_and_smoke_is_ineligible() -> None:
             "mean_reward": 0.6,
             "completions": 4,
             "max_turn_truncations": 3,
+            "passed": True,
         },
     ]
     result = main.select_candidates(rows)
     assert result["winner"]["phase"] == "C"
-    assert result["eligible_phases"] == ["A", "B", "C"]
-    assert result["smoke_is_reference_only"] is True
+    assert result["eligible_phases"] == ["B", "C"]
+    assert result["reference_only_phases"] == ["smoke", "failed_A"]
     with pytest.raises(ValueError, match="paired-seed"):
         main.select_candidates(
             [rows[0], rows[1], {**rows[2], "paired_seeds": [3]}, rows[3]]

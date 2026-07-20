@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "kind": "uav_operator_training_recovery_decision",
+  "status": "ABANDONED_AS_PARENT",
+  "failed_phase": "A",
+  "failed_global_step": 30,
+  "failed_training_run_id": "r6n3cud398dkrhnsoqwxpsjk",
+  "failed_adapter_id": "npn2nu01kpb3u402x1igr86v",
+  "phase_a_total_cost_usd": 1.4739461,
+  "replacement_parent_run_id": "vhuh1or0bar3cht6ql0jzazs",
+  "replacement_parent_checkpoint_id": "g1akido7qfo58e3my36wnqrz",
+  "replacement_parent_step": 20,
+  "decision": "Preserve Phase A as failed experimental evidence, bypass it as a training parent, and start mixed Phase B directly from selected smoke step 20.",
+  "frozen_environment": {
+    "simulator_changed": false,
+    "reward_changed": false,
+    "prompt_changed": false,
+    "datasets_changed": false,
+    "max_turns_changed": false
+  },
+  "forensics": {
+    "source": "saved deterministic exact-step-30 T2/T3 dev rollouts",
+    "source_run_ids": ["03199cc2", "fb5ff505"],
+    "classification_counts": {
+      "airborne_holding_stall": 1,
+      "ground_pending_stall": 7
+    },
+    "episodes": [
+      {"tier":"T2","seed":10002,"scenario_id":"T2-002-bay-farm","classification":"airborne_holding_stall","action_counts":{"file_flight_plan":1,"amend_route":4,"hold":4,"get_telemetry":5},"no_tool_calls":0},
+      {"tier":"T2","seed":10000,"scenario_id":"T2-000-treasure-island","classification":"ground_pending_stall","action_counts":{"file_flight_plan":6,"hold":1,"get_telemetry":4},"no_tool_calls":1},
+      {"tier":"T2","seed":10001,"scenario_id":"T2-001-pier-39","classification":"ground_pending_stall","action_counts":{"file_flight_plan":2,"hold":2,"get_airspace":3},"no_tool_calls":9},
+      {"tier":"T2","seed":10005,"scenario_id":"T2-005-treasure-island","classification":"ground_pending_stall","action_counts":{"file_flight_plan":6,"get_telemetry":5},"no_tool_calls":0},
+      {"tier":"T3","seed":10001,"scenario_id":"T3-001-pier-39","classification":"ground_pending_stall","action_counts":{"file_flight_plan":2,"hold":1,"resume":1},"no_tool_calls":0},
+      {"tier":"T3","seed":10000,"scenario_id":"T3-000-treasure-island","classification":"ground_pending_stall","action_counts":{"file_flight_plan":5,"get_weather":5,"get_telemetry":6},"no_tool_calls":0},
+      {"tier":"T3","seed":10002,"scenario_id":"T3-002-bay-farm","classification":"ground_pending_stall","action_counts":{"file_flight_plan":4,"hold":2,"resume":2},"no_tool_calls":0},
+      {"tier":"T3","seed":10004,"scenario_id":"T3-004-richmond-channel","classification":"ground_pending_stall","action_counts":{"file_flight_plan":1,"amend_route":3,"hold":1,"resume":1},"no_tool_calls":1}
+    ],
+    "observed_patterns": [
+      "repeated_plan_filing",
+      "repeated_polling",
+      "holding",
+      "route_amendment",
+      "no_tool_call"
+    ],
+    "training_diagnostic": {
+      "hard_safety_violations": 1,
+      "note": "One exploratory training rollout at global step 23 received a simulator-derived hard-safety penalty; it is retained as diagnostic evidence and is not substituted for exact-checkpoint gating."
+    }
+  }
+}

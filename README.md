@@ -186,14 +186,15 @@ and [comparison plot](assets/training/day8_qwen35_2b_t1_checkpoint_selection.png
 preserve the decision and paired-seed deltas. Earlier free-model failures
 remain in the historical [training status report](docs/DAY8_FREE_TRAINING.md).
 
-The next cycle is prepared as three separately approved, warm-started phases:
-10 T1 updates, 20 mixed T1/T2 updates, then 20 mixed T1/T2/T3 updates. The
+The recovery cycle is prepared as two separately approved, warm-started phases:
+20 mixed T1/T2 updates from smoke step 20, then 20 mixed T1/T2/T3 updates. The
 [manual main-training protocol](docs/MAIN_TRAINING.md) freezes the curriculum,
 `$15` fail-closed ledger, provenance chain, stop rules, evidence locations, and
 post-training selection. Phase A completed for `$1.4739` including exact
-checkpoint validation, but failed the truncation gate on T2 and T3; Phase B is
-withheld pending a remediation decision. See the
-[Phase A review](assets/training/main_phase_a_exact_step30.json).
+checkpoint validation, but failed the truncation gate on T2 and T3. It remains
+a scientific reference and is bypassed as a parent. See the
+[Phase A review](assets/training/main_phase_a_exact_step30.json) and committed
+[recovery decision](assets/training/main_phase_a_recovery_decision.json).
 
 ## Documentation
 

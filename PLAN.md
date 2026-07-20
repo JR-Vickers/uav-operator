@@ -208,26 +208,27 @@ truncations (8 vs 11). The evaluations cost $0.6253 combined. Freeze step 20
 as the curriculum checkpoint and use its residual 26.7% max-turn truncation
 rate to design the next measured curriculum without touching final-eval seeds.
 
-**Main-cycle preparation amendment (2026-07-20; PREPARED, NOT LAUNCHED).**
-Continue from selected checkpoint `g1akido7qfo58e3my36wnqrz` through three
-separately approved warm-started runs: Phase A is 10 updates at 100% T1;
-Phase B is 20 updates at 40% T1 / 60% T2; Phase C is 20 updates at 25% T1 /
-45% T2 / 30% T3. These are 50 additional warm-started updates, not a claimed
-uninterrupted 70-step optimizer trajectory. Each phase evaluates six dev
+**Main-cycle recovery amendment (2026-07-20; PREPARED, NOT LAUNCHED).**
+Continue from selected checkpoint `g1akido7qfo58e3my36wnqrz` through two
+separately approved warm-started runs: Phase B is 20 updates at 40% T1 / 60%
+T2; Phase C is 20 updates at 25% T1 / 45% T2 / 30% T3. These are 40 additional
+warm-started updates, not a claimed uninterrupted 60-step optimizer trajectory.
+Each phase evaluates six dev
 examples from every T0–T3 tier at each phase start and every 10 updates, retains two
 checkpoint/adapter milestones, and requires a passing captured predecessor
 before its successor can be prepared.
 
-Prime's warm-start API treats `max_steps` as a global target, so the actual
-targets are 30 for A, 50 for B, and 70 for C. The first approved launch command
+Prime's warm-start API treats `max_steps` as a global target, so the recovery
+targets are 40 for B and 60 for C. The first approved launch command
 used 10 for Phase A and was rejected before run creation or billing; configs
-and capture gates now preserve the intended 20→30→50→70 checkpoint lineage.
+and capture gates now preserve the recovered 20→40→60 checkpoint lineage.
 
-The aggregate paid cap is now `$15.00`: `$3.0469` is already spent; Phase
-A/B/C hard ceilings are `$1.50`, `$2.35`, and `$2.40`; `$1.75`, `$0.75`, and
+The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
+Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.35` and `$2.40`;
+`$1.75`, `$0.75`, and
 `$1.25` remain reserved for final candidate comparison, trained-model
-red-team, and frozen evaluation. Hard ceilings total `$13.0469`, leaving
-`$1.9531` unallocated. The Phase-A increase from `$1.25` was explicitly
+red-team, and frozen evaluation. Hard commitments total `$13.0208461`, leaving
+`$1.9791539` unallocated. The Phase-A increase from `$1.25` was explicitly
 approved after refreshed pricing projected `$1.4413`. The exact manual protocol and stop rules are frozen in
 `docs/MAIN_TRAINING.md`. No phase launch is authorized by this preparation;
 each requires refreshed live gates and separate approval after its predecessor
@@ -236,8 +237,10 @@ capture passes.
 **Phase A review (2026-07-20; FAILED GATE).** Run
 `r6n3cud398dkrhnsoqwxpsjk` completed steps 20-30. An exact step-30 adapter
 evaluation was safety-clean and error-free, but T2 and T3 each maxed out in
-4/6 episodes, exceeding the 50% truncation gate. Phase B is withheld. Phase A
-cost `$1.4739461` including the clean validation, within its `$1.50` ceiling.
+4/6 episodes, exceeding the 50% truncation gate. Its eight T2/T3 truncations
+are seven ground/pending stalls and one airborne holding stall. Phase A is
+preserved but abandoned as a parent; mixed Phase B starts from smoke step 20.
+Phase A cost `$1.4739461` including clean validation remains sunk.
 
 ### Historical blocked-mode parallel plan (Day 8 is now unblocked)
 
