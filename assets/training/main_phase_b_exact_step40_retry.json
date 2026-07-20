@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "uav_operator_main_training_exact_evaluation_retry",
+  "captured_at": "2026-07-21",
+  "phase": "B",
+  "classification": "scientific_failure_truncation",
+  "passed": false,
+  "continuation_ready": false,
+  "training_run_id": "aygdxtalsw85xbznsj0k288m",
+  "training_run_cost_usd": 1.9938,
+  "adapter_id": "j21ahkcyttbbu3ponk9on8m5",
+  "adapter_step": 40,
+  "adapter_status": "READY",
+  "deployment_status": "DEPLOYED",
+  "checkpoint_id": "ezalshw3415w0z9kb8z56vji",
+  "checkpoint_status": "UPLOADING",
+  "routing_probe": {
+    "phase_b_successes": 10,
+    "phase_b_requests": 10,
+    "phase_a_adapter_id": "npn2nu01kpb3u402x1igr86v",
+    "phase_a_successes": 10,
+    "phase_a_requests": 10,
+    "response_edge": "SIN",
+    "provider_errors": 0,
+    "reported_cost_usd": 0.002
+  },
+  "exact_evaluation": {
+    "run_id": "e6136883",
+    "expected_rows": 24,
+    "completed_rows": 24,
+    "seed_min": 10000,
+    "seed_max": 10023,
+    "unique_seeds": 24,
+    "provider_errors": 0,
+    "cancelled_rows": 0,
+    "non_finite_rewards": 0,
+    "missing_state_or_log_rows": 0,
+    "hard_safety_penalties": 0,
+    "mission_completions": 10,
+    "mean_reward": 0.22595217588470376,
+    "reported_cost_usd": 0.2942734,
+    "truncation_definition": "is_truncated is true or stop_condition is max_turns_reached",
+    "truncation_by_tier": {
+      "T0": {"count": 0, "n": 6, "rate": 0.0},
+      "T1": {"count": 5, "n": 6, "rate": 0.8333333333333334},
+      "T2": {"count": 3, "n": 6, "rate": 0.5},
+      "T3": {"count": 4, "n": 6, "rate": 0.6666666666666666}
+    }
+  },
+  "capture_validation": {
+    "required_eval_milestones": [20, 30, 40],
+    "required_eval_milestones_present": true,
+    "ready_adapter_steps": [30, 40],
+    "ready_checkpoint_steps": [20, 30],
+    "failures": [
+      "exact-checkpoint truncation exceeds 50% for T1",
+      "exact-checkpoint truncation exceeds 50% for T3"
+    ],
+    "continuation_failures": [
+      "retained READY checkpoint steps are incomplete",
+      "exact final READY checkpoint is unavailable"
+    ]
+  },
+  "cost_reconciliation": {
+    "prior_failed_exact_evaluations_usd": 0.0515559,
+    "clean_routing_probe_and_exact_retry_usd": 0.2962734,
+    "phase_b_validation_total_usd": 0.3478293,
+    "phase_b_training_and_validation_total_usd": 2.3416293,
+    "phase_b_hard_ceiling_usd": 2.9
+  },
+  "decision": "Routing recovered, but the exact adapter failed the frozen per-tier truncation gate. Phase C and T4 remain unauthorized.",
+  "raw_results_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/e6136883/results.jsonl",
+  "raw_metadata_path": "outputs/evals/uav-operator--Qwen--Qwen3.5-2B:j21ahkcyttbbu3ponk9on8m5/e6136883/metadata.json",
+  "normalized_evaluation_path": "outputs/main-training/phase-b/exact-step-40-retry.json",
+  "full_capture_path": "outputs/main-training/phase-b/capture-retry.json"
+}

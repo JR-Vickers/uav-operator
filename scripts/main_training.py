@@ -43,6 +43,7 @@ PHASE_B_CHECKPOINT_ID = "ezalshw3415w0z9kb8z56vji"
 PHASE_B_FALLBACK_CHECKPOINT_ID = "hq9o5apo977l7hpkk5n0tpaf"
 PHASE_B_FINAL_STEP = 40
 PHASE_B_RUN_COST_USD = 1.9938
+PHASE_B_VALIDATION_COST_USD = 0.3478293
 EXACT_DEV_SEEDS = tuple(range(10_000, 10_024))
 EXACT_TIERS = ("T0", "T1", "T2", "T3")
 
@@ -406,6 +407,7 @@ def budget(
     total = (
         EXISTING_EVIDENCE_COST_USD
         + FAILED_PHASE_A_COST_USD
+        + PHASE_B_VALIDATION_COST_USD
         + sum(remaining_phases.values())
         + sum(RESERVED_COSTS_USD.values())
     )
@@ -424,6 +426,7 @@ def budget(
         "failures": failures,
         "existing_evidence_usd": EXISTING_EVIDENCE_COST_USD,
         "failed_phase_a_sunk_cost_usd": FAILED_PHASE_A_COST_USD,
+        "phase_b_validation_sunk_cost_usd": PHASE_B_VALIDATION_COST_USD,
         "phase_costs_usd": remaining_phases,
         "reserved_costs_usd": RESERVED_COSTS_USD,
         "projected_total_usd": total,
@@ -548,6 +551,11 @@ def _metric_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     return _rows(payload, "metrics", "data")
 
 
+def _rollout_args(run_id: str, step: int) -> list[str]:
+    """Build arguments for the current JSON-emitting Prime rollouts command."""
+    return ["train", "rollouts", run_id, "--step", str(step)]
+
+
 def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     failures: list[str] = []
     phase = PHASES[str(artifact.get("phase"))]
@@ -598,7 +606,7 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         for row in metrics
         if any(str(key).startswith("eval/") for key in row)
     }
-    if eval_steps != expected_eval_steps:
+    if not expected_eval_steps.issubset(eval_steps):
         failures.append("evaluation milestones are incomplete")
     training_safety_events = 0
     for step, payload in samples.items() if isinstance(samples, dict) else []:
@@ -961,7 +969,7 @@ def capture(
     samples = {
         str(step): fetch(
             f"samples_{step}",
-            ["train", "rollouts", run_id, "--step", str(step), "--output", "json"],
+            _rollout_args(run_id, step),
         )
         for step in steps
     }

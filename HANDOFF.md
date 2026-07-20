@@ -12,19 +12,22 @@
   `$0.2942734` cost within the `$0.35` ceiling.
 - The retry still fails the scientific gate: T3 had 4/6 max-turn truncations
   (66.7%), above the frozen per-tier 50% ceiling. T0/T1/T2 truncation was
-  0/6, 3/6, and 3/6. Mean reward was `0.22595`, with 10/24 completions. The
+  0/6, 5/6, and 3/6 under the canonical combined truncation definition. Mean
+  reward was `0.22595`, with 10/24 completions. The
   earlier provider-failed runs remain invalid evidence.
-- Normalized evidence is `outputs/main-training/phase-b/exact-step-40-retry.json`;
-  raw results are under the adapter's `outputs/evals/.../e6136883/` directory.
-- The full capture wrapper currently fails because the installed Prime CLI
-  rejects its stale `train rollouts --output json` flag. This did not affect
-  the completed evaluation or direct exact-row audit.
+- Compact committed evidence is
+  `assets/training/main_phase_b_exact_step40_retry.json`; normalized and full
+  captures remain under `outputs/main-training/phase-b/`, with raw results
+  under the adapter's `outputs/evals/.../e6136883/` directory.
+- The full capture wrapper was updated for the current Prime CLI and completed.
+  It also confirmed that Prime repeats eval metric keys on intermediate
+  optimizer rows and that required milestones 20/30/40 are all present.
 
 Next action:
 
 - Preserve Phase B as scientifically failed and do not prepare Phase C under
-  the frozen decision tree. Update the capture wrapper for the current Prime
-  CLI before the next metadata capture workflow.
+  the frozen decision tree. Continue with the training-independent packaging
+  and publication work in PLAN.md.
 
 ## 2026-07-20 Phase B exact-adapter validation preparation
 

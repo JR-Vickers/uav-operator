@@ -181,7 +181,8 @@ closed unless eligibility is affirmatively exposed. Evidence and analysis are
 in `assets/training/day8_llama_1b_diagnostic.json` and
 `docs/DAY8_FREE_TRAINING.md`. Do not launch the 50-step smoke.
 
-**Day 9 — smoke-run postmortem + curriculum config. ACTIVE.** Fix only what the
+**Day 9 — smoke-run postmortem + curriculum config. COMPLETE; RECOVERY GATE
+FAILED.** Fix only what the
 completed smoke's evidence shows (reward normalization, degenerate rollouts,
 turn caps, or curriculum difficulty). Decide T1→T2 versus mixed-from-start from
 that evidence and freeze the environment for the main run. No larger run may
@@ -208,7 +209,8 @@ truncations (8 vs 11). The evaluations cost $0.6253 combined. Freeze step 20
 as the curriculum checkpoint and use its residual 26.7% max-turn truncation
 rate to design the next measured curriculum without touching final-eval seeds.
 
-**Main-cycle recovery amendment (2026-07-20; PREPARED, NOT LAUNCHED).**
+**Main-cycle recovery amendment (2026-07-20; EXECUTED THROUGH PHASE B, PHASE C
+CLOSED).**
 Continue from selected checkpoint `g1akido7qfo58e3my36wnqrz` through two
 separately approved warm-started runs: Phase B is 20 updates at 40% T1 / 60%
 T2; Phase C is 20 updates at 25% T1 / 45% T2 / 30% T3. These are 40 additional
@@ -233,9 +235,9 @@ and capture gates now preserve the recovered 20→40→60 checkpoint lineage.
 Phase B subsequently completed as run `aygdxtalsw85xbznsj0k288m` for
 `$1.9938`. READY step-40 adapter `j21ahkcyttbbu3ponk9on8m5` is the sole
 scientific-validation candidate; checkpoint `ezalshw3415w0z9kb8z56vji`
-remains an independent continuation gate. Its deterministic exact-adapter
-T0–T3 evaluation is prepared but not authorized. Phase C stays blocked unless
-that evaluation passes and the step-40 checkpoint becomes READY.
+remains incomplete. Its deterministic exact-adapter T0–T3 evaluation was run
+and failed the behavioral gate as recorded below. Phase C is closed under the
+frozen decision tree.
 
 **Exact Phase-B result: FAILED (2026-07-20).** Evaluation `bfa67b49` was
 stopped after 7/24 rows when two model requests returned HTTP 404
@@ -249,6 +251,20 @@ failures in its first four rows and was stopped at `$0.0083627`. Cumulative
 saved-metadata cost across both attempts is `$0.0515559`. The repeated
 provider failure leaves the gate result unchanged.
 
+**Routing recovery retry (2026-07-21; BEHAVIORAL GATE FAILED).** Both exact
+Phase A and Phase B adapters subsequently passed 10/10 sequential inference
+probes, all through Prime's Singapore edge. The unchanged Phase B exact
+evaluation `e6136883` then completed 24/24 rows with zero provider errors,
+finite rewards, complete saved simulator state/logs, and zero hard-safety
+penalties. It nevertheless failed the frozen gate because T3 reached 4/6
+max-turn truncations (66.7%), above the per-tier 50% ceiling. T0/T1/T2 were
+0/6, 5/6, and 3/6 when the canonical gate includes both `is_truncated` and
+`max_turns_reached`. This clean retry establishes that routing recovered; it
+does not validate the earlier interrupted evaluations or authorize Phase C.
+Under the frozen decision tree the paid recovery cycle ends here, T4 remains
+cut, and the project proceeds via the honest environment-plus-limited-T1-
+learning-evidence exit.
+
 The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
 Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.90` and `$2.40`;
 `$1.75`, `$0.75`, and
@@ -259,6 +275,13 @@ approved after refreshed pricing projected `$1.4413`. The exact manual protocol 
 `docs/MAIN_TRAINING.md`. No phase launch is authorized by this preparation;
 each requires refreshed live gates and separate approval after its predecessor
 capture passes.
+
+Phase B validation ultimately spent `$0.3478293`: `$0.0515559` on the two
+provider-failed attempts and `$0.2962734` on the clean routing probe plus exact
+retry. With the `$1.9938` training run, actual Phase B spend is `$2.3416293`,
+inside its unchanged `$2.90` ceiling. The reconciled projected total is
+`$12.4686754`; hard commitments and unallocated headroom remain unchanged
+because validation spend was already bounded by the Phase B ceiling.
 
 The user explicitly raised the recovery Phase-B ceiling from `$2.35` to
 `$2.90` after live prices projected `$2.8825466`. This approval does not alter
@@ -339,7 +362,7 @@ There are two honest exits from blocked mode:
 
 ## Phase 3 — the money shots (Days 10–14)
 
-**Day 10 — main free training run launches. GATE (fleet decision).** Size the
+**Day 10 — main training run. CLOSED AFTER PHASE-B GATE FAILURE.** Size the
 run from the completed 50-step smoke's throughput, truncation, and learning
 evidence; 150 and 300 steps are options, not commitments. The selected model
 must remain effectively free at launch, and the same availability, pricing,
@@ -352,6 +375,11 @@ FLEET GATE: T4 unlocks ONLY if the run is launched and healthy by end of day
 AND HACKS.md has ≥3 closed exploits. Otherwise T4 is cut — write one honest
 "future work" paragraph and never look back.
 
+The later paid Qwen amendment superseded the original free-only launch path.
+Phase B completed but failed its frozen exact-evaluation truncation gate on
+2026-07-21, so Phase C is unauthorized and T4 is cut. No further training run
+belongs to this plan without a new protocol amendment and budget authorization.
+
 **Day 11 — curve + iterate.** If curve rises: extend run / harvest checkpoint
 evals; render the before/after pair on identical seeds. If flat: triage in
 order — reward scale, task too hard (shift mix toward T1/T2), context
@@ -361,7 +389,7 @@ flat curve on T3. Adjust claim to match evidence, not vice versa.
 **Day 12 — red-team round 2 + writeup draft. PARTIALLY COMPLETE / EVIDENCE
 BLOCKED.** The future trained-model adversarial runner and training-independent
 article/thread drafts are complete. The runner has not been executed because no
-trained adapter exists. Learning-curve, checkpoint, learned-behavior,
+gate-passing trained adapter exists. Learning-curve, checkpoint, learned-behavior,
 trained-leaderboard, same-seed, and round-two findings remain empty. When
 training is restored, run the *trained* model adversarially, then document and
 fix any exploit (or document it honestly as open).

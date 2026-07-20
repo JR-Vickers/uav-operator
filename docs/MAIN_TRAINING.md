@@ -44,13 +44,14 @@ before run creation or billing, which supplied this platform evidence.
 |---|---:|---:|
 | Existing diagnostic, smoke, and checkpoint comparison | $3.0469 | $3.0469 |
 | Failed Phase A including clean validation (sunk) | $1.4739461 | $1.4739461 |
+| Phase B exact validations and routing probes (sunk) | $0.3478293 | within Phase B ceiling |
 | Phase B | $1.90 | $2.90 |
 | Phase C | $1.95 | $2.40 |
 | Post-training dev comparison | reserved | $1.75 |
 | T2/T3 red-team | reserved | $0.75 |
 | Frozen final evaluation | reserved | $1.25 |
 
-Expected total is `$12.1208461`; hard commitments total `$13.5708461`,
+Expected total is `$12.4686754`; hard commitments total `$13.5708461`,
 leaving `$1.4291539` below the aggregate `$15.00` cap. A pricing change recomputes
 the phase projection from the paid smoke's measured tokens. It cannot silently
 consume the unallocated amount. Missing pricing, capacity, wallet, Hub status,
@@ -66,6 +67,13 @@ On 2026-07-20 live pricing projected recovery Phase B at `$2.8825466`, above
 its original `$2.35` ceiling. The user explicitly approved raising only the
 Phase B ceiling to `$2.90`; the aggregate `$15.00` cap and downstream reserves
 remain unchanged.
+
+Actual Phase B validation spend is `$0.3478293`: `$0.0515559` for the two
+provider-failed exact evaluations plus `$0.2962734` for the clean 2026-07-21
+routing probe and exact-evaluation retry. Together with the `$1.9938` training
+run, actual Phase B spend is `$2.3416293`, within its unchanged `$2.90` hard
+ceiling. The validation amount is recorded separately from run metadata so the
+capture continues to reconcile Prime's original training-run cost exactly.
 
 ## Manual commands and evidence
 
@@ -99,7 +107,8 @@ uv run python scripts/main_training.py budget assets/training/main_phase_*.json
 ```
 
 Capture retrieves the run, exact TOML, metrics, distributions, usage, logs,
-rollouts, checkpoints, and the deployment registry. It requires completed
+rollouts, checkpoints, and the deployment registry. The current CLI emits
+rollout JSON directly; no `--output` option is passed. Capture requires completed
 expected steps, finite rewards, zero provider errors/cancelled rows, exact
 READY retained adapters, matching provenance, and a reconciled phase cost
 below its ceiling. `passed` records that scientific result independently from
@@ -168,11 +177,15 @@ On 2026-07-21 both deployed adapters passed a fresh 10-request sequential probe
 (20/20 total, all response IDs routed through `SIN`, `$0.0020` reported cost).
 The unchanged Phase B workload was retried as `e6136883` and completed all 24
 rows with zero provider errors for `$0.2942734`. Routing had recovered, but the
-frozen scientific gate still failed: T3 reached 4/6 max-turn truncations
-(66.7%), above the per-tier 50% ceiling. T0/T1/T2 were 0/6, 3/6, and 3/6;
-all tiers had zero hard-safety penalties. This is a behavioral gate failure,
+frozen scientific gate still failed: T3 reached 4/6 truncations (66.7%), above
+the per-tier 50% ceiling. The canonical gate records T0/T1/T2 as 0/6, 5/6,
+and 3/6 because it includes both `is_truncated` and `max_turns_reached`.
+All tiers had zero hard-safety penalties. This is a behavioral gate failure,
 not retroactive validation of `bfa67b49` or `eb93c282`, and it does not
 authorize Phase C.
+The compact capture and cost reconciliation are committed at
+`assets/training/main_phase_b_exact_step40_retry.json`; full state/log evidence
+remains in the saved local evaluation artifact.
 
 Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
 `ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment

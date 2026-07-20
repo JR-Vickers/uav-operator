@@ -442,6 +442,24 @@ def test_capture_validation_accepts_complete_phase_and_final_checkpoint() -> Non
     assert summary["final_checkpoint"]["id"] == "cp-40"
 
 
+def test_capture_accepts_repeated_eval_metrics_between_required_milestones() -> None:
+    artifact = _capture_artifact()
+    repeated = dict(artifact["metrics"]["metrics"][0])
+    repeated["step"] = 21
+    artifact["metrics"]["metrics"].append(repeated)
+    assert main.validate_capture(artifact)["passed"] is True
+
+
+def test_rollout_args_match_current_prime_cli() -> None:
+    assert main._rollout_args("run-1", 20) == [
+        "train",
+        "rollouts",
+        "run-1",
+        "--step",
+        "20",
+    ]
+
+
 @pytest.mark.parametrize(
     ("mutation", "failure"),
     [
@@ -671,7 +689,9 @@ def test_summarize_exact_b_requires_exact_tier_seed_coverage(tmp_path: Path) -> 
 
 
 def test_budget_ledger_and_billing_reconciliation_failures(tmp_path: Path) -> None:
-    assert main.budget([])["projected_total_usd"] == pytest.approx(12.1208461)
+    ledger = main.budget([])
+    assert ledger["phase_b_validation_sunk_cost_usd"] == pytest.approx(0.3478293)
+    assert ledger["projected_total_usd"] == pytest.approx(12.4686754)
     assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.5708461)
     assert main.budget([])["unallocated_after_hard_ceilings_usd"] == pytest.approx(
         1.4291539

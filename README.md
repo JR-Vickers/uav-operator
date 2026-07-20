@@ -217,8 +217,11 @@ A later routing-health retry found both Phase A and Phase B adapters healthy
 (10/10 sequential requests each). Phase B exact eval `e6136883` then completed
 24/24 rows with zero provider errors and zero hard-safety penalties, but still
 failed the frozen behavioral gate because T3 max-turn truncation was 4/6
-(66.7%). The clean retry distinguishes recovered platform routing from model
+(66.7%) and the canonical combined truncation gate also marked T1 at 5/6
+(83.3%). The clean retry distinguishes recovered platform routing from model
 readiness; Phase C remains unauthorized.
+See the compact
+[clean-retry evidence](assets/training/main_phase_b_exact_step40_retry.json).
 
 ## Documentation
 
