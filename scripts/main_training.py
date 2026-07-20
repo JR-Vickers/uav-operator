@@ -230,19 +230,18 @@ def phase_toml(phase: Phase, checkpoint_id: str) -> str:
             "skip_first_step = false",
         ]
     )
-    for tier in ("T0", "T1", "T2", "T3"):
-        lines.extend(
-            [
-                "",
-                "[[eval.env]]",
-                f'name = "dev_{tier.lower()}"',
-                f'id = "{ENVIRONMENT}"',
-                "num_examples = 6",
-                "rollouts_per_example = 1",
-                "max_retries = 0",
-                f'args = {{ tier = "{tier}", dataset_split = "dev", max_examples = 6, max_turns = 20 }}',
-            ]
-        )
+    lines.extend(
+        [
+            "",
+            "[[eval.env]]",
+            'name = "dev_mixed"',
+            f'id = "{ENVIRONMENT}"',
+            "num_examples = 24",
+            "rollouts_per_example = 1",
+            "max_retries = 0",
+            'args = { tier = "mixed_day5", dataset_split = "dev", max_examples = 24, max_turns = 20 }',
+        ]
+    )
     lines.extend(
         [
             "",

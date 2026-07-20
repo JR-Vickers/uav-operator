@@ -1,5 +1,23 @@
 # HANDOFF.md
 
+## 2026-07-20 Phase B hosted-eval consolidation
+
+- Runs `b2oubcurqhhfcsoh3443wru5` and `ju9j3zjlligjfgt3pwy8fxyy` each failed
+  during environment startup after exactly five of six containers became
+  healthy; different eval slots failed. Both recorded zero steps, tokens, and
+  cost, so neither is an ML result or budget spend.
+- Phase B/C hosted milestones now use one `dev_mixed` environment with 24
+  deterministic dev rows, exactly six per T0–T3 tier. Together with `train_t1`
+  and `train_t2`, Phase B starts three containers instead of six.
+- The separate deterministic exact-checkpoint T0–T3 capture remains the only
+  passing safety/truncation gate. Simulator, reward, prompt, dataset generation,
+  tier mixture, cadence, and turn limit are unchanged.
+
+Next action:
+
+- Run full checks, commit the amendment, refresh live preparation, and request
+  separate approval before launching the new config.
+
 ## 2026-07-20 Phase B budget amendment approved
 
 - The user explicitly raised only the Phase B hard ceiling from `$2.35` to

@@ -23,13 +23,14 @@ static ratio. Training remains Qwen3.5-2B RL/GRPO with batch 16, two
 rollouts/example, four in flight, learning rate `3e-5`, LoRA alpha 32,
 temperature 0.7, 1,024 tokens, thinking disabled, 20 turns, and zero retries.
 
-Each evaluation milestone uses four separate dev environments (T0–T3), six
-examples per tier, one rollout/example, temperature 0, 1,024 tokens, 20 turns,
-zero retries, and the initial step. No T0 or final-eval row enters training.
+Each hosted evaluation milestone uses one deterministic `mixed_day5` dev
+environment containing six examples from each T0–T3 tier (24 total), one
+rollout/example, temperature 0, 1,024 tokens, 20 turns, zero retries, and the
+initial step. No T0 or final-eval row enters training.
 Simulator, reward, prompt, generator, and split semantics remain frozen.
-Training entries use unique names such as `train_t1`; evaluation entries use
-`dev_t0` through `dev_t3`. Prime rejects repeated instances of the same Hub ID
-unless each entry has a unique name.
+Training entries use unique names such as `train_t1`; the evaluation entry is
+`dev_mixed`. The single mixed entry preserves tier coverage while avoiding the
+six-container startup pattern that failed twice before training began.
 
 Prime interprets Hosted Training `max_steps` as an absolute global target when
 warm-starting. Therefore the recovery TOMLs use `max_steps = 40` and `60`;
@@ -126,6 +127,14 @@ Exploratory training rollouts remain diagnostic evidence, including any
 simulator-derived safety penalty. The launch safety gate is evaluated on the
 deterministic exact-checkpoint dev workload. Hosted milestone evaluations that
 mix policy versions are not accepted as exact-checkpoint evidence.
+
+Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
+`ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment
+containers before a different eval slot failed. Both ended at zero steps,
+zero tokens, and `$0.00`. The recovery config consolidates the four hosted dev
+slots into `dev_mixed`, reducing the total to three containers without changing
+the dev rows per tier. Evidence is in
+`assets/training/main_phase_b_startup_failures.json`.
 
 ## Phase A result (2026-07-20)
 

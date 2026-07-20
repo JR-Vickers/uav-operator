@@ -195,6 +195,12 @@ checkpoint validation, but failed the truncation gate on T2 and T3. It remains
 a scientific reference and is bypassed as a parent. See the
 [Phase A review](assets/training/main_phase_a_exact_step30.json) and committed
 [recovery decision](assets/training/main_phase_a_recovery_decision.json).
+Two subsequent Phase-B launches failed at zero steps, tokens, and cost because
+different sixth environment containers missed startup. The amended config uses
+one stratified 24-row T0–T3 dev environment alongside the two training
+environments; the external exact-checkpoint gate is unchanged. The captured
+[startup evidence](assets/training/main_phase_b_startup_failures.json) preserves
+both failed run IDs.
 
 ## Documentation
 

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "uav_operator_hosted_training_startup_failures",
+  "phase": "B",
+  "status": "NO_TRAINING_OCCURRED",
+  "runs": [
+    {
+      "run_id": "b2oubcurqhhfcsoh3443wru5",
+      "status": "FAILED",
+      "failed_environment": "dev_t2",
+      "ready_environment_count": 5,
+      "configured_environment_count": 6,
+      "optimizer_steps": 0,
+      "tokens": 0,
+      "cost_usd": 0.0,
+      "failure": "120-second environment health-check timeout"
+    },
+    {
+      "run_id": "ju9j3zjlligjfgt3pwy8fxyy",
+      "status": "FAILED",
+      "failed_environment": "dev_t3",
+      "ready_environment_count": 5,
+      "configured_environment_count": 6,
+      "optimizer_steps": 0,
+      "tokens": 0,
+      "cost_usd": 0.0,
+      "failure": "environment startup ended with BackoffLimitExceeded"
+    }
+  ],
+  "diagnosis": "Two different sixth environment slots failed while both training environments and the other evaluation environments became healthy. This is treated as a reproducible hosted startup/concurrency interaction, not an ML result or simulator failure.",
+  "remediation": {
+    "hosted_training_environment_count": 3,
+    "training_environments": ["train_t1", "train_t2"],
+    "evaluation_environments": ["dev_mixed"],
+    "dev_mixed_workload": {
+      "tier": "mixed_day5",
+      "dataset_split": "dev",
+      "examples": 24,
+      "examples_per_tier": 6,
+      "tiers": ["T0", "T1", "T2", "T3"]
+    },
+    "scientific_gate": "A separate deterministic exact-checkpoint T0-T3 evaluation remains mandatory."
+  }
+}

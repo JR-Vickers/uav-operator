@@ -218,6 +218,13 @@ examples from every T0–T3 tier at each phase start and every 10 updates, retai
 checkpoint/adapter milestones, and requires a passing captured predecessor
 before its successor can be prepared.
 
+After two Phase-B attempts each started five of six environment containers and
+then failed a different eval slot at zero steps/tokens/cost, hosted milestone
+evaluation was consolidated into one 24-row `mixed_day5` dev environment. It
+still contains exactly six T0–T3 rows at every milestone and does not replace
+the deterministic external exact-checkpoint gate. Phase B now starts three
+containers total: two training mixtures and one mixed dev evaluator.
+
 Prime's warm-start API treats `max_steps` as a global target, so the recovery
 targets are 40 for B and 60 for C. The first approved launch command
 used 10 for Phase A and was rejected before run creation or billing; configs

@@ -127,24 +127,22 @@ def test_phase_configs_are_exact_and_use_only_train_dev(phase_name: str) -> None
     assert config["eval"]["num_examples"] == 24
     assert config["eval"]["rollouts_per_example"] == 1
     assert [row["args"]["tier"] for row in config["eval"]["env"]] == [
-        "T0",
-        "T1",
-        "T2",
-        "T3",
+        "mixed_day5"
     ]
-    assert [row["name"] for row in config["eval"]["env"]] == [
-        "dev_t0",
-        "dev_t1",
-        "dev_t2",
-        "dev_t3",
-    ]
-    assert len({row["name"] for row in config["eval"]["env"]}) == 4
+    assert [row["name"] for row in config["eval"]["env"]] == ["dev_mixed"]
+    assert len({row["name"] for row in config["eval"]["env"]}) == 1
     assert all(
-        row["num_examples"] == 6
+        row["num_examples"] == 24
         and row["rollouts_per_example"] == 1
         and row["max_retries"] == 0
         for row in config["eval"]["env"]
     )
+    assert config["eval"]["env"][0]["args"] == {
+        "tier": "mixed_day5",
+        "dataset_split": "dev",
+        "max_examples": 24,
+        "max_turns": 20,
+    }
     assert config["eval"]["sampling"] == {
         "max_tokens": 1024,
         "temperature": 0.0,
@@ -189,6 +187,28 @@ def test_training_and_dev_views_are_deterministic_and_final_eval_is_disjoint() -
             and sets[0].isdisjoint(sets[2])
             and sets[1].isdisjoint(sets[2])
         )
+
+
+def test_hosted_mixed_dev_view_is_six_per_tier_and_final_eval_disjoint() -> None:
+    rows = list(
+        uav_operator.load_environment(
+            tier="mixed_day5",
+            dataset_split="dev",
+            max_examples=24,
+            max_turns=20,
+        ).get_eval_dataset()
+    )
+    assert {
+        tier: sum(row["info"]["tier"] == tier for row in rows)
+        for tier in ("T0", "T1", "T2", "T3")
+    } == {tier: 6 for tier in ("T0", "T1", "T2", "T3")}
+    final_seeds = {
+        row["info"]["seed"]
+        for row in uav_operator.load_environment(
+            tier="mixed_day5", dataset_split="eval", max_examples=60
+        ).get_eval_dataset()
+    }
+    assert {row["info"]["seed"] for row in rows}.isdisjoint(final_seeds)
 
 
 def test_prepare_b_writes_hashed_manual_only_bundle(tmp_path: Path) -> None:
