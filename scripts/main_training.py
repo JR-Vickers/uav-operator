@@ -212,6 +212,7 @@ def phase_toml(phase: Phase, checkpoint_id: str) -> str:
             [
                 "",
                 "[[env]]",
+                f'name = "train_{tier.lower()}"',
                 f'id = "{ENVIRONMENT}"',
                 f"ratio = {ratio}",
                 "max_retries = 0",
@@ -233,6 +234,7 @@ def phase_toml(phase: Phase, checkpoint_id: str) -> str:
             [
                 "",
                 "[[eval.env]]",
+                f'name = "dev_{tier.lower()}"',
                 f'id = "{ENVIRONMENT}"',
                 "num_examples = 6",
                 "rollouts_per_example = 1",

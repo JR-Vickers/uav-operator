@@ -28,6 +28,9 @@ Each evaluation milestone uses four separate dev environments (T0–T3), six
 examples per tier, one rollout/example, temperature 0, 1,024 tokens, 20 turns,
 zero retries, and the initial step. No T0 or final-eval row enters training.
 Simulator, reward, prompt, generator, and split semantics remain frozen.
+Training entries use unique names such as `train_t1`; evaluation entries use
+`dev_t0` through `dev_t3`. Prime rejects repeated instances of the same Hub ID
+unless each entry has a unique name.
 
 Prime interprets Hosted Training `max_steps` as an absolute global target when
 warm-starting. Therefore the three TOMLs use `max_steps = 30`, `50`, and `70`;

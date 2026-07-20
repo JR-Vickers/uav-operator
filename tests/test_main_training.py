@@ -107,6 +107,10 @@ def test_phase_configs_are_exact_and_use_only_train_dev(phase_name: str) -> None
     assert [(row["args"]["tier"], row["ratio"]) for row in config["env"]] == list(
         phase.mixture
     )
+    assert [row["name"] for row in config["env"]] == [
+        f"train_{tier.lower()}" for tier, _ in phase.mixture
+    ]
+    assert len({row["name"] for row in config["env"]}) == len(config["env"])
     assert all(
         row["args"]
         == {
@@ -128,6 +132,13 @@ def test_phase_configs_are_exact_and_use_only_train_dev(phase_name: str) -> None
         "T2",
         "T3",
     ]
+    assert [row["name"] for row in config["eval"]["env"]] == [
+        "dev_t0",
+        "dev_t1",
+        "dev_t2",
+        "dev_t3",
+    ]
+    assert len({row["name"] for row in config["eval"]["env"]}) == 4
     assert all(
         row["num_examples"] == 6
         and row["rollouts_per_example"] == 1

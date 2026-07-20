@@ -12,6 +12,19 @@
   Monitor for startup and enforce the 15-minute no-progress and `$1.50` stop
   gates. Capture and validate the complete run before preparing Phase B.
 
+Failure follow-up:
+
+- Run `j31uthcbwxg2zcapdy4vxtje` failed at orchestrator validation before any
+  step, token, or charge because all four eval entries inherited the same Hub
+  environment name. Add explicit `train_t*` and `dev_t*` names, regenerate the
+  bundle, and relaunch from the unchanged step-20 checkpoint. Apply the naming
+  fix to B/C mixtures as well.
+- Naming fix passed 130 tests, lint, and build. The refreshed config SHA-256 is
+  `4bf1453d476874009857f7ae3676027e35ed3aff98d62312fa3301081bbc2ab5`.
+  User authorized relaunch; corrected run `r6n3cud398dkrhnsoqwxpsjk` was
+  created with the server confirming `train_t1` and `dev_t0`–`dev_t3` names.
+  Initial status is `PENDING` with zero tokens and `$0.00` usage.
+
 ## 2026-07-20 staged main-training cycle prepared; no paid run launched
 
 Changed:
