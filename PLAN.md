@@ -224,15 +224,19 @@ used 10 for Phase A and was rejected before run creation or billing; configs
 and capture gates now preserve the recovered 20→40→60 checkpoint lineage.
 
 The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
-Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.35` and `$2.40`;
+Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.90` and `$2.40`;
 `$1.75`, `$0.75`, and
 `$1.25` remain reserved for final candidate comparison, trained-model
-red-team, and frozen evaluation. Hard commitments total `$13.0208461`, leaving
-`$1.9791539` unallocated. The Phase-A increase from `$1.25` was explicitly
+red-team, and frozen evaluation. Hard commitments total `$13.5708461`, leaving
+`$1.4291539` unallocated. The Phase-A increase from `$1.25` was explicitly
 approved after refreshed pricing projected `$1.4413`. The exact manual protocol and stop rules are frozen in
 `docs/MAIN_TRAINING.md`. No phase launch is authorized by this preparation;
 each requires refreshed live gates and separate approval after its predecessor
 capture passes.
+
+The user explicitly raised the recovery Phase-B ceiling from `$2.35` to
+`$2.90` after live prices projected `$2.8825466`. This approval does not alter
+the `$15.00` aggregate cap or any comparison, red-team, or final-eval reserve.
 
 **Phase A review (2026-07-20; FAILED GATE).** Run
 `r6n3cud398dkrhnsoqwxpsjk` completed steps 20-30. An exact step-30 adapter

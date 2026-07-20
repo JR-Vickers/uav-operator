@@ -490,12 +490,12 @@ def test_exact_checkpoint_evidence_fails_closed(mutation: str) -> None:
 
 def test_budget_ledger_and_billing_reconciliation_failures(tmp_path: Path) -> None:
     assert main.budget([])["projected_total_usd"] == pytest.approx(12.1208461)
-    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.0208461)
+    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.5708461)
     assert main.budget([])["unallocated_after_hard_ceilings_usd"] == pytest.approx(
-        1.9791539
+        1.4291539
     )
     capture = tmp_path / "a.json"
-    _write(capture, {"phase": "B", "summary": {"passed": True, "run_cost_usd": 2.36}})
+    _write(capture, {"phase": "B", "summary": {"passed": True, "run_cost_usd": 2.91}})
     with pytest.raises(ValueError, match="ceiling breached"):
         main.budget([capture])
     with pytest.raises(ValueError, match="unavailable"):

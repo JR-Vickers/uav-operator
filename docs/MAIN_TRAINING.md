@@ -43,14 +43,14 @@ before run creation or billing, which supplied this platform evidence.
 |---|---:|---:|
 | Existing diagnostic, smoke, and checkpoint comparison | $3.0469 | $3.0469 |
 | Failed Phase A including clean validation (sunk) | $1.4739461 | $1.4739461 |
-| Phase B | $1.90 | $2.35 |
+| Phase B | $1.90 | $2.90 |
 | Phase C | $1.95 | $2.40 |
 | Post-training dev comparison | reserved | $1.75 |
 | T2/T3 red-team | reserved | $0.75 |
 | Frozen final evaluation | reserved | $1.25 |
 
-Expected total is `$12.1208461`; hard commitments total `$13.0208461`,
-leaving `$1.9791539` below the aggregate `$15.00` cap. A pricing change recomputes
+Expected total is `$12.1208461`; hard commitments total `$13.5708461`,
+leaving `$1.4291539` below the aggregate `$15.00` cap. A pricing change recomputes
 the phase projection from the paid smoke's measured tokens. It cannot silently
 consume the unallocated amount. Missing pricing, capacity, wallet, Hub status,
 or billing evidence fails closed.
@@ -60,6 +60,11 @@ effective inference-input price was `$0.05/M`, producing a conservative
 `$1.4413` projection against the original `$1.25` ceiling. The user then
 approved a narrow increase to `$1.50`, leaving the `$15.00` aggregate cap and
 all downstream reserves unchanged.
+
+On 2026-07-20 live pricing projected recovery Phase B at `$2.8825466`, above
+its original `$2.35` ceiling. The user explicitly approved raising only the
+Phase B ceiling to `$2.90`; the aggregate `$15.00` cap and downstream reserves
+remain unchanged.
 
 ## Manual commands and evidence
 

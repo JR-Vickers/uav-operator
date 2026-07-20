@@ -1,5 +1,16 @@
 # HANDOFF.md
 
+## 2026-07-20 Phase B budget amendment approved
+
+- The user explicitly raised only the Phase B hard ceiling from `$2.35` to
+  `$2.90` after the live `$2.8825466` projection failed closed.
+- Aggregate hard commitments are now `$13.5708461`, leaving `$1.4291539`
+  below the unchanged `$15` cap. Comparison, red-team, and final-evaluation
+  reserves are unchanged.
+- Refresh repository checks and live preparation, then present the generated
+  command for a separate launch confirmation. No training is launched by this
+  amendment.
+
 ## 2026-07-20 recovery branch prepared; no paid run launched
 
 - Phase A step 30 is preserved as failed evidence and is ineligible as a
