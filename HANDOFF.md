@@ -1,5 +1,30 @@
 # HANDOFF.md
 
+## 2026-07-20 Phase B exact-adapter validation preparation
+
+- Switched main-cycle adapter discovery from `prime train models` to the
+  deployment registry and require one exact READY run/model/step match.
+- Added a manual exact-adapter deployment/evaluation bundle and a vf-eval
+  normalizer for the 24 frozen mixed-dev rows.
+- Split `passed` (scientific validity) from `continuation_ready` (READY final
+  checkpoint), preserving the `$1.9938` run cost and artifact evidence.
+- Phase C remains fail-closed without both gates.
+- No deployment, inference, checkpoint refresh, or fallback training ran.
+
+Verified:
+
+- `uv run ruff check .`
+- `uv run pytest -q` — 139 passed, one dependency deprecation warning.
+- `uv build`
+- `git diff --check`
+
+Next action:
+
+- After explicit inference-cost approval, deploy adapter
+  `j21ahkcyttbbu3ponk9on8m5`, wait for `DEPLOYED`, run its emitted exact eval,
+  summarize/capture it, then refresh checkpoint
+  `ezalshw3415w0z9kb8z56vji`.
+
 ## 2026-07-20 Phase B hosted-eval consolidation
 
 - Runs `b2oubcurqhhfcsoh3443wru5` and `ju9j3zjlligjfgt3pwy8fxyy` each failed

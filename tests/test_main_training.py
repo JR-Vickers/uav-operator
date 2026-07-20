@@ -74,6 +74,7 @@ def _passing_predecessor(
             "run_id": run_id,
             "summary": {
                 "passed": True,
+                "continuation_ready": True,
                 "run_cost_usd": 1.0,
                 "final_checkpoint": {
                     "id": checkpoint_id,
@@ -305,6 +306,11 @@ def test_prepare_c_requires_passing_b_and_exact_final_checkpoint(
     _write(path, payload)
     with pytest.raises(ValueError, match="has not passed"):
         main.resolve_input(main.PHASES["C"], path)
+    payload["summary"]["passed"] = True
+    payload["summary"]["continuation_ready"] = False
+    _write(path, payload)
+    with pytest.raises(ValueError, match="continuation is not ready"):
+        main.resolve_input(main.PHASES["C"], path)
 
 
 @pytest.mark.parametrize(
@@ -413,14 +419,15 @@ def _capture_artifact(phase_name: str = "B") -> dict[str, Any]:
             "rows": [
                 {
                     "tier": tier,
+                    "seed": 10_000 + tier_index * 6 + offset,
                     "reward": 0.2,
                     "stop_condition": "has_final_env_response",
                     "metrics": {"hard_safety": 0},
                     "sim_state": {"mission": {"status": "completed"}},
                     "sim_log": [{}],
                 }
-                for tier in ("T0", "T1", "T2", "T3")
-                for _ in range(6)
+                for tier_index, tier in enumerate(("T0", "T1", "T2", "T3"))
+                for offset in range(6)
             ],
         },
     }
@@ -431,6 +438,7 @@ def test_capture_validation_accepts_complete_phase_and_final_checkpoint() -> Non
     artifact = _capture_artifact()
     summary = main.validate_capture(artifact)
     assert summary["passed"] is True
+    assert summary["continuation_ready"] is True
     assert summary["final_checkpoint"]["id"] == "cp-40"
 
 
@@ -441,7 +449,6 @@ def test_capture_validation_accepts_complete_phase_and_final_checkpoint() -> Non
         ("steps", "sample steps"),
         ("distribution", "distribution steps"),
         ("eval", "evaluation milestones"),
-        ("checkpoint", "checkpoint"),
         ("adapter", "adapter"),
         ("provider", "provider errors"),
         ("cancelled", "cancelled"),
@@ -506,6 +513,161 @@ def test_exact_checkpoint_evidence_fails_closed(mutation: str) -> None:
     else:
         artifact["exact_checkpoint_evaluation"]["hosted_milestone"] = True
     assert main.validate_capture(artifact)["passed"] is False
+
+
+def test_capture_can_pass_scientifically_without_ready_final_checkpoint() -> None:
+    artifact = _capture_artifact()
+    artifact["checkpoints"]["checkpoints"][-1]["status"] = "UPLOADING"
+    summary = main.validate_capture(artifact)
+    assert summary["passed"] is True
+    assert summary["continuation_ready"] is False
+    assert summary["final_checkpoint"] is None
+    assert "exact final READY checkpoint is unavailable" in summary["continuation_failures"]
+
+
+def test_completed_phase_b_preserves_exact_adapter_and_original_cost() -> None:
+    artifact = _capture_artifact()
+    artifact["run_id"] = main.PHASE_B_RUN_ID
+    artifact["exact_checkpoint_evaluation"].update(
+        {
+            "training_run_id": main.PHASE_B_RUN_ID,
+            "adapter_id": main.PHASE_B_ADAPTER_ID,
+            "model_id": f"{main.MODEL}:{main.PHASE_B_ADAPTER_ID}",
+        }
+    )
+    artifact["adapters"]["models"] = [
+        {**row, "rft_run_id": main.PHASE_B_RUN_ID}
+        for row in artifact["adapters"]["models"]
+    ]
+    artifact["usage"]["total_cost_usd"] = main.PHASE_B_RUN_COST_USD
+    assert main.validate_capture(artifact)["passed"] is True
+    artifact["usage"]["total_cost_usd"] = 1.0
+    assert "original Phase-B run cost is not preserved" in main.validate_capture(
+        artifact
+    )["failures"]
+
+
+def _exact_deployment_fixture(root: Path, *, deployed: bool = True) -> Path:
+    _write(
+        root / "deployments.json",
+        {
+            "models": [
+                {
+                    "id": "platform-null-alias",
+                    "rft_run_id": main.PHASE_B_RUN_ID,
+                    "base_model": main.MODEL,
+                    "step": None,
+                    "status": "READY",
+                },
+                {
+                    "id": "step-39-alias",
+                    "rft_run_id": main.PHASE_B_RUN_ID,
+                    "base_model": main.MODEL,
+                    "step": 39,
+                    "status": "READY",
+                },
+                {
+                    "id": main.PHASE_B_ADAPTER_ID,
+                    "rft_run_id": main.PHASE_B_RUN_ID,
+                    "base_model": main.MODEL,
+                    "step": 40,
+                    "status": "READY",
+                    "deployment_status": "DEPLOYED" if deployed else "NOT_DEPLOYED",
+                    "checkpoint_id": main.PHASE_B_CHECKPOINT_ID,
+                },
+            ]
+        },
+    )
+    return root
+
+
+def test_prepare_exact_b_uses_deployment_registry_and_ignores_aliases(tmp_path: Path) -> None:
+    fixtures = _exact_deployment_fixture(tmp_path / "fixtures")
+    manifest = main.prepare_exact_phase_b(tmp_path / "bundle", fixtures)
+    assert manifest["status"] == "ready_for_manual_eval"
+    assert manifest["adapter_id"] == main.PHASE_B_ADAPTER_ID
+    assert manifest["manual_eval_command"].startswith("prime --plain eval run ")
+    config = tomllib.loads((tmp_path / "bundle" / "exact-step-40.toml").read_text())
+    assert config["env_args"] == {
+        "tier": "mixed_day5",
+        "dataset_split": "dev",
+        "max_examples": 24,
+        "max_turns": 20,
+    }
+    assert config["num_examples"] == 24
+    assert config["rollouts_per_example"] == 1
+    assert config["temperature"] == 0
+    assert config["max_retries"] == 0
+    assert config["state_columns"] == ["sim_state", "sim_log"]
+
+
+def test_prepare_exact_b_requires_deployed_and_unambiguous_adapter(tmp_path: Path) -> None:
+    fixtures = _exact_deployment_fixture(tmp_path / "fixtures", deployed=False)
+    manifest = main.prepare_exact_phase_b(tmp_path / "bundle", fixtures)
+    assert manifest["status"] == "awaiting_adapter_deployment"
+    assert manifest["manual_eval_command"] is None
+    assert main.PHASE_B_ADAPTER_ID in manifest["manual_deployment_command"]
+    payload = json.loads((fixtures / "deployments.json").read_text())
+    payload["models"].append(dict(payload["models"][-1]))
+    _write(fixtures / "deployments.json", payload)
+    with pytest.raises(ValueError, match="exactly one"):
+        main.prepare_exact_phase_b(tmp_path / "ambiguous", fixtures)
+
+
+def test_summarize_exact_b_requires_exact_tier_seed_coverage(tmp_path: Path) -> None:
+    fixtures = _exact_deployment_fixture(tmp_path / "fixtures")
+    bundle = tmp_path / "bundle"
+    main.prepare_exact_phase_b(bundle, fixtures)
+    run_dir = tmp_path / "run"
+    rows = []
+    for tier_index, tier in enumerate(main.EXACT_TIERS):
+        for offset in range(6):
+            rows.append(
+                {
+                    "info": {"tier": tier, "seed": 10_000 + tier_index * 6 + offset},
+                    "reward": 0.25,
+                    "error": None,
+                    "stop_condition": "has_final_env_response",
+                    "is_truncated": False,
+                    "metrics": {"hard_safety": 0.0},
+                    "sim_state": {"seed": 10_000 + tier_index * 6 + offset},
+                    "sim_log": [{}],
+                }
+            )
+    run_dir.mkdir()
+    _write(
+        run_dir / "metadata.json",
+        {
+            "run_id": "eval-phase-b",
+            "env_id": "uav-operator",
+            "model": f"{main.MODEL}:{main.PHASE_B_ADAPTER_ID}",
+            "num_examples": 24,
+            "rollouts_per_example": 1,
+            "state_columns": ["sim_state", "sim_log"],
+            "env_args": {
+                "tier": "mixed_day5",
+                "dataset_split": "dev",
+                "max_examples": 24,
+                "max_turns": 20,
+            },
+            "sampling_args": {"temperature": 0, "max_tokens": 1024},
+        },
+    )
+    (run_dir / "results.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows)
+    )
+    result = main.summarize_exact_phase_b(
+        run_dir, bundle / "exact-manifest.json", tmp_path / "exact.json"
+    )
+    assert len(result["rows"]) == 24
+    rows[0]["info"]["seed"] = 9999
+    (run_dir / "results.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows)
+    )
+    with pytest.raises(ValueError, match="coverage"):
+        main.summarize_exact_phase_b(
+            run_dir, bundle / "exact-manifest.json", tmp_path / "bad.json"
+        )
 
 
 def test_budget_ledger_and_billing_reconciliation_failures(tmp_path: Path) -> None:

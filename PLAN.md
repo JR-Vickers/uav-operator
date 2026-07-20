@@ -230,6 +230,13 @@ targets are 40 for B and 60 for C. The first approved launch command
 used 10 for Phase A and was rejected before run creation or billing; configs
 and capture gates now preserve the recovered 20→40→60 checkpoint lineage.
 
+Phase B subsequently completed as run `aygdxtalsw85xbznsj0k288m` for
+`$1.9938`. READY step-40 adapter `j21ahkcyttbbu3ponk9on8m5` is the sole
+scientific-validation candidate; checkpoint `ezalshw3415w0z9kb8z56vji`
+remains an independent continuation gate. Its deterministic exact-adapter
+T0–T3 evaluation is prepared but not authorized. Phase C stays blocked unless
+that evaluation passes and the step-40 checkpoint becomes READY.
+
 The aggregate paid cap is `$15.00`: `$3.0469` was already spent and failed
 Phase A's `$1.4739461` is sunk; Phase B/C ceilings are `$2.90` and `$2.40`;
 `$1.75`, `$0.75`, and

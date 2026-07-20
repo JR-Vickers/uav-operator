@@ -201,6 +201,11 @@ one stratified 24-row T0–T3 dev environment alongside the two training
 environments; the external exact-checkpoint gate is unchanged. The captured
 [startup evidence](assets/training/main_phase_b_startup_failures.json) preserves
 both failed run IDs.
+The completed replacement Phase-B run has a READY step-40 adapter while its
+final checkpoint upload remains incomplete. The exact-adapter workflow now
+validates 24 frozen T0–T3 dev rows before classifying the ML result;
+checkpoint readiness is separate and Phase C remains blocked until both gates
+pass. The original Phase-B training cost is `$1.9938`.
 
 ## Documentation
 

@@ -99,10 +99,12 @@ uv run python scripts/main_training.py budget assets/training/main_phase_*.json
 ```
 
 Capture retrieves the run, exact TOML, metrics, distributions, usage, logs,
-rollouts, checkpoints, and adapters. It requires completed expected steps,
-finite rewards, zero provider errors/cancelled rows, exact retained artifacts,
-a final READY checkpoint, matching checkpoint provenance, and a reconciled
-phase cost below its ceiling. Model prose is stored only if the platform
+rollouts, checkpoints, and the deployment registry. It requires completed
+expected steps, finite rewards, zero provider errors/cancelled rows, exact
+READY retained adapters, matching provenance, and a reconciled phase cost
+below its ceiling. `passed` records that scientific result independently from
+`continuation_ready`, which additionally requires both retained checkpoint
+milestones and exactly one READY final checkpoint. Model prose is stored only if the platform
 rollout response necessarily includes it; it is never read or judged by a
 gate. Reward and safety evidence remain simulator-derived.
 
@@ -114,7 +116,8 @@ Stop the active run, or withhold the next approval, for any of:
 - provider errors or cancelled rows;
 - 15 minutes without optimizer progress;
 - missing expected optimizer/evaluation steps;
-- no exact final READY checkpoint and adapter;
+- no exact final READY adapter (scientific failure), or no exact final READY
+  checkpoint (continuation blocker);
 - any negative `hard_safety` reward component (a positive penalty magnitude);
 - more than 50% max-turn truncation at an evaluation milestone;
 - the phase or cumulative cost ceiling being reached or breached.
@@ -127,6 +130,28 @@ Exploratory training rollouts remain diagnostic evidence, including any
 simulator-derived safety penalty. The launch safety gate is evaluated on the
 deterministic exact-checkpoint dev workload. Hosted milestone evaluations that
 mix policy versions are not accepted as exact-checkpoint evidence.
+
+## Phase B exact step-40 recovery (2026-07-20)
+
+Completed run `aygdxtalsw85xbznsj0k288m` reports its original `$1.9938` cost.
+The deployment registry exposes READY step-40 adapter
+`j21ahkcyttbbu3ponk9on8m5`; checkpoint `ezalshw3415w0z9kb8z56vji` has not
+completed upload. Platform-created null/step-39 aliases remain evidence but do
+not satisfy or invalidate the exact step-40 lookup.
+
+```bash
+uv run python scripts/main_training.py prepare-exact-b
+uv run python scripts/main_training.py summarize-exact-b VF_EVAL_RUN_DIR \
+  --manifest outputs/main-training/phase-b/exact-manifest.json
+```
+
+The emitted manual workload is 24 `mixed_day5` dev rows—seeds 10000–10023,
+six per T0–T3—at temperature 0, one rollout per example, 20 turns, zero
+retries, with saved `sim_state`/`sim_log`. A failure scientifically fails Phase
+B. After a pass, refresh the checkpoint. If it is still unavailable, Phase C
+stays blocked. A fallback from READY step-30 checkpoint
+`hq9o5apo977l7hpkk5n0tpaf` would be a new stochastic branch; add its projected
+cost to the `$15` ledger and obtain separate approval before launch.
 
 Two initial Phase-B launches (`b2oubcurqhhfcsoh3443wru5` and
 `ju9j3zjlligjfgt3pwy8fxyy`) each started exactly five of six environment

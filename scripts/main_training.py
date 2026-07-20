@@ -37,6 +37,14 @@ PRICE_FIELDS = (
     "effective_inference_input_price_per_mtok",
     "effective_inference_output_price_per_mtok",
 )
+PHASE_B_RUN_ID = "aygdxtalsw85xbznsj0k288m"
+PHASE_B_ADAPTER_ID = "j21ahkcyttbbu3ponk9on8m5"
+PHASE_B_CHECKPOINT_ID = "ezalshw3415w0z9kb8z56vji"
+PHASE_B_FALLBACK_CHECKPOINT_ID = "hq9o5apo977l7hpkk5n0tpaf"
+PHASE_B_FINAL_STEP = 40
+PHASE_B_RUN_COST_USD = 1.9938
+EXACT_DEV_SEEDS = tuple(range(10_000, 10_024))
+EXACT_TIERS = ("T0", "T1", "T2", "T3")
 
 
 @dataclass(frozen=True)
@@ -317,6 +325,8 @@ def resolve_input(
     if predecessor_capture is None:
         raise ValueError(f"Phase-{phase.predecessor} capture is required")
     capture = _load_capture(predecessor_capture, phase.predecessor)
+    if capture.get("summary", {}).get("continuation_ready") is not True:
+        raise ValueError(f"Phase-{phase.predecessor} continuation is not ready")
     final = capture["summary"].get("final_checkpoint", {})
     checkpoint_id = final.get("id", final.get("checkpoint_id"))
     run_id = capture.get("run_id")
@@ -608,10 +618,29 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
     exact_rows = _rows(exact, "rows", "samples", "rollouts")
     if exact.get("checkpoint_step") != final_step or exact.get("policy") != "exact_checkpoint":
         failures.append("deterministic exact-checkpoint evaluation is unavailable")
+    if (
+        exact.get("training_run_id", artifact.get("run_id")) != artifact.get("run_id")
+        or exact.get("model_id", f"{MODEL}:{exact.get('adapter_id')}")
+        != f"{MODEL}:{exact.get('adapter_id')}"
+    ):
+        failures.append("exact-adapter run/model provenance mismatch")
+    if phase.name == "B" and (
+        artifact.get("run_id") == PHASE_B_RUN_ID
+        and exact.get("adapter_id") != PHASE_B_ADAPTER_ID
+    ):
+        failures.append("Phase-B exact adapter identity mismatch")
     if exact.get("temperature") != 0 or exact.get("hosted_milestone") is True:
         failures.append("mixed-policy hosted milestone is not final checkpoint evidence")
     if len(exact_rows) != 24:
         failures.append("exact-checkpoint evaluation row coverage is incomplete")
+    exact_seed_tiers = {(row.get("seed"), row.get("tier")) for row in exact_rows}
+    expected_seed_tiers = {
+        (10_000 + tier_index * 6 + offset, tier)
+        for tier_index, tier in enumerate(EXACT_TIERS)
+        for offset in range(6)
+    }
+    if exact_seed_tiers != expected_seed_tiers:
+        failures.append("exact-checkpoint tier/seed coverage is incomplete")
     for tier in ("T0", "T1", "T2", "T3"):
         tier_rows = [row for row in exact_rows if row.get("tier") == tier]
         truncated = 0
@@ -626,6 +655,15 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
                 _finite(row.get("reward"), "exact-checkpoint reward")
             except ValueError as exc:
                 failures.append(str(exc))
+            row_metrics = row.get("metrics")
+            if not isinstance(row_metrics, dict):
+                failures.append("exact-checkpoint metrics are missing")
+            else:
+                for key, value in row_metrics.items():
+                    try:
+                        _finite(value, f"exact-checkpoint metrics.{key}")
+                    except ValueError as exc:
+                        failures.append(str(exc))
             if row.get("stop_condition") == "max_turns_reached" or row.get("is_truncated") is True:
                 truncated += 1
             hard = row.get("metrics", {}).get("hard_safety", 0) if isinstance(row.get("metrics"), dict) else 0
@@ -645,20 +683,32 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         row.get("step") for row in checkpoints if row.get("status") == "READY"
     )
     expected_retained = [phase.start_step + phase.artifact_interval, final_step]
-    if retained_steps != expected_retained:
-        failures.append("retained READY checkpoint steps are incomplete")
+    retained_milestones = sorted(set(retained_steps) & set(expected_retained))
     final_matches = [
         row
         for row in checkpoints
         if row.get("step") == final_step and row.get("status") == "READY"
     ]
+    continuation_failures: list[str] = []
+    if retained_milestones != expected_retained:
+        continuation_failures.append("retained READY checkpoint steps are incomplete")
     if len(final_matches) != 1:
-        failures.append("exact final READY checkpoint is unavailable")
-    adapter_steps = sorted(
-        row.get("step") for row in adapters if row.get("status") == "READY"
-    )
+        continuation_failures.append("exact final READY checkpoint is unavailable")
+    ready_adapters = [
+        row
+        for row in adapters
+        if row.get("status") == "READY"
+        and row.get("step") in expected_retained
+        and row.get("base_model", row.get("baseModel", MODEL)) == MODEL
+    ]
+    adapter_steps = sorted({row.get("step") for row in ready_adapters})
     if adapter_steps != expected_retained:
         failures.append("retained READY adapter steps are incomplete")
+    if any(
+        sum(row.get("step") == step for row in ready_adapters) != 1
+        for step in expected_retained
+    ):
+        failures.append("retained READY adapters are ambiguous")
     try:
         cost = _finite(
             artifact.get("usage", {}).get("total_cost_usd"), "usage.total_cost_usd"
@@ -668,12 +718,21 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         cost = math.nan
     if math.isfinite(cost) and cost > phase.hard_ceiling_usd:
         failures.append("phase cost ceiling breached")
+    if (
+        phase.name == "B"
+        and artifact.get("run_id") == PHASE_B_RUN_ID
+        and math.isfinite(cost)
+        and not math.isclose(cost, PHASE_B_RUN_COST_USD, abs_tol=1e-9)
+    ):
+        failures.append("original Phase-B run cost is not preserved")
     input_provenance = artifact.get("manifest", {}).get("input_provenance")
     if config.get("checkpoint_id") != (input_provenance or {}).get("checkpoint_id"):
         failures.append("warm-start provenance mismatch")
     return {
         "passed": not failures,
         "failures": failures,
+        "continuation_ready": not failures and not continuation_failures,
+        "continuation_failures": continuation_failures,
         "run_cost_usd": cost,
         "provider_errors": provider_errors,
         "cancelled_rows": cancelled,
@@ -683,7 +742,191 @@ def validate_capture(artifact: Mapping[str, Any]) -> dict[str, Any]:
         "ready_checkpoint_steps": retained_steps,
         "ready_adapter_steps": adapter_steps,
         "final_checkpoint": final_matches[0] if len(final_matches) == 1 else None,
+        "platform_artifact_evidence": {
+            "checkpoint_upload_incomplete": len(final_matches) != 1,
+            "ready_final_adapter": next(
+                (row for row in ready_adapters if row.get("step") == final_step),
+                None,
+            ),
+        },
     }
+
+
+def exact_eval_toml(model_id: str) -> str:
+    return f'''model = {json.dumps(model_id)}
+provider = "prime"
+api_client_type = "openai_chat_completions"
+
+env_args = {{ tier = "mixed_day5", dataset_split = "dev", max_examples = 24, max_turns = 20 }}
+num_examples = 24
+rollouts_per_example = 1
+max_concurrent = 4
+max_retries = 0
+max_tokens = 1024
+temperature = 0
+state_columns = ["sim_state", "sim_log"]
+save_results = true
+disable_tui = true
+verbose = true
+
+[[eval]]
+id = "uav-operator"
+'''
+
+
+def prepare_exact_phase_b(
+    output_dir: Path, fixture_dir: Path | None = None
+) -> dict[str, Any]:
+    deployments = _fixture_or_live(
+        fixture_dir,
+        "deployments",
+        ["deployments", "list", "--num", "100", "--output", "json"],
+    )
+    matches = [
+        row
+        for row in _rows(deployments, "models")
+        if row.get("id") == PHASE_B_ADAPTER_ID
+        and row.get("rft_run_id", row.get("rftRunId")) == PHASE_B_RUN_ID
+        and row.get("base_model", row.get("baseModel")) == MODEL
+        and row.get("step") == PHASE_B_FINAL_STEP
+    ]
+    if len(matches) != 1:
+        raise ValueError("expected exactly one Phase-B run/model/step adapter")
+    adapter = matches[0]
+    if adapter.get("status") != "READY":
+        raise ValueError("Phase-B adapter status is not READY")
+    deployment_status = adapter.get(
+        "deployment_status", adapter.get("deploymentStatus")
+    )
+    model_id = f"{MODEL}:{PHASE_B_ADAPTER_ID}"
+    config_text = exact_eval_toml(model_id)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config_path = output_dir / "exact-step-40.toml"
+    config_path.write_text(config_text)
+    deployed = deployment_status == "DEPLOYED"
+    manifest = {
+        "schema_version": 1,
+        "kind": "uav_operator_phase_b_exact_adapter_prepare",
+        "prepared_at": _now(),
+        "status": "ready_for_manual_eval" if deployed else "awaiting_adapter_deployment",
+        "training_run_id": PHASE_B_RUN_ID,
+        "base_model": MODEL,
+        "step": PHASE_B_FINAL_STEP,
+        "adapter_id": PHASE_B_ADAPTER_ID,
+        "checkpoint_id": adapter.get("checkpoint_id", adapter.get("checkpointId")),
+        "model_id": model_id,
+        "adapter_status": adapter.get("status"),
+        "deployment_status": deployment_status,
+        "config_path": str(config_path.resolve()),
+        "config_sha256": _sha256(config_text.encode()),
+        "workload": {
+            "tier": "mixed_day5",
+            "dataset_split": "dev",
+            "expected_seeds": list(EXACT_DEV_SEEDS),
+            "expected_tiers": {tier: 6 for tier in EXACT_TIERS},
+            "num_examples": 24,
+            "rollouts_per_example": 1,
+            "temperature": 0,
+            "max_turns": 20,
+            "max_retries": 0,
+            "state_columns": ["sim_state", "sim_log"],
+        },
+        "manual_deployment_command": None
+        if deployed
+        else f"prime --plain deployments create {PHASE_B_ADAPTER_ID} --yes",
+        "manual_eval_command": None
+        if not deployed
+        else f"prime --plain eval run {config_path.resolve()} --output-dir {output_dir.resolve()} --skip-upload",
+    }
+    (output_dir / "exact-manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    )
+    return manifest
+
+
+def summarize_exact_phase_b(
+    run_dir: Path, manifest_path: Path, output: Path
+) -> dict[str, Any]:
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("status") != "ready_for_manual_eval":
+        raise ValueError("exact-adapter manifest is not ready for evaluation")
+    config_path = Path(manifest["config_path"])
+    if _sha256(config_path.read_bytes()) != manifest.get("config_sha256"):
+        raise ValueError("exact-adapter config hash mismatch")
+    metadata = json.loads((run_dir / "metadata.json").read_text())
+    expected_metadata = {
+        "env_id": "uav-operator",
+        "model": manifest["model_id"],
+        "num_examples": 24,
+        "rollouts_per_example": 1,
+        "state_columns": ["sim_state", "sim_log"],
+    }
+    if any(metadata.get(key) != value for key, value in expected_metadata.items()):
+        raise ValueError("exact-adapter evaluation metadata mismatch")
+    env_args = metadata.get("env_args")
+    if not isinstance(env_args, dict) or any(
+        env_args.get(key) != value
+        for key, value in {
+            "tier": "mixed_day5",
+            "dataset_split": "dev",
+            "max_examples": 24,
+            "max_turns": 20,
+        }.items()
+    ):
+        raise ValueError("exact-adapter environment metadata mismatch")
+    sampling = metadata.get("sampling_args")
+    if not isinstance(sampling, dict) or sampling.get("temperature") != 0:
+        raise ValueError("exact-adapter sampling metadata mismatch")
+    rows = [
+        json.loads(line)
+        for line in (run_dir / "results.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    normalized = []
+    for index, row in enumerate(rows):
+        info = row.get("info")
+        if not isinstance(info, dict):
+            raise ValueError(f"row {index}: info is missing")
+        metrics = row.get("metrics")
+        if not isinstance(metrics, dict):
+            raise ValueError(f"row {index}: metrics are missing")
+        normalized.append(
+            {
+                "tier": info.get("tier"),
+                "seed": info.get("seed"),
+                "reward": row.get("reward"),
+                "provider_error": row.get("error"),
+                "status": row.get("status"),
+                "stop_condition": row.get("stop_condition"),
+                "is_truncated": row.get("is_truncated"),
+                "metrics": metrics,
+                "sim_state": row.get("sim_state"),
+                "sim_log": row.get("sim_log"),
+            }
+        )
+    seed_tiers = {(row["seed"], row["tier"]) for row in normalized}
+    # mixed_day5 dev assigns consecutive six-seed blocks by tier.
+    expected_seed_tiers = {
+        (10_000 + tier_index * 6 + offset, tier)
+        for tier_index, tier in enumerate(EXACT_TIERS)
+        for offset in range(6)
+    }
+    if len(normalized) != 24 or seed_tiers != expected_seed_tiers:
+        raise ValueError("exact mixed-dev tier/seed coverage is incomplete")
+    payload = {
+        "policy": "exact_checkpoint",
+        "checkpoint_step": PHASE_B_FINAL_STEP,
+        "adapter_id": PHASE_B_ADAPTER_ID,
+        "training_run_id": PHASE_B_RUN_ID,
+        "model_id": manifest["model_id"],
+        "eval_run_id": metadata.get("run_id", run_dir.name),
+        "temperature": 0,
+        "hosted_milestone": False,
+        "rows": normalized,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n")
+    return payload
 
 
 def capture(
@@ -745,7 +988,9 @@ def capture(
         "checkpoints": fetch(
             "checkpoints", ["train", "checkpoints", run_id, "--output", "json"]
         ),
-        "adapters": fetch("adapters", ["train", "models", "--output", "json"]),
+        "adapters": fetch(
+            "adapters", ["deployments", "list", "--num", "100", "--output", "json"]
+        ),
         "samples_by_step": samples,
         "exact_checkpoint_evaluation": exact_evaluation,
         "content_policy": "No model prose is judged; all gates use platform status and simulator-derived metrics.",
@@ -859,6 +1104,13 @@ def main() -> None:
     capture_parser.add_argument("--fixture-dir", type=Path)
     budget_parser = sub.add_parser("budget")
     budget_parser.add_argument("captures", nargs="*", type=Path)
+    exact_prepare_parser = sub.add_parser("prepare-exact-b")
+    exact_prepare_parser.add_argument("--output-dir", type=Path)
+    exact_prepare_parser.add_argument("--fixture-dir", type=Path)
+    exact_summary_parser = sub.add_parser("summarize-exact-b")
+    exact_summary_parser.add_argument("run_dir", type=Path)
+    exact_summary_parser.add_argument("--manifest", required=True, type=Path)
+    exact_summary_parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.operation == "prepare":
         result = prepare(
@@ -877,8 +1129,18 @@ def main() -> None:
             args.exact_evaluation,
             args.fixture_dir,
         )
-    else:
+    elif args.operation == "budget":
         result = budget(args.captures)
+    elif args.operation == "prepare-exact-b":
+        result = prepare_exact_phase_b(
+            args.output_dir or OUTPUT_ROOT / "phase-b", args.fixture_dir
+        )
+    else:
+        result = summarize_exact_phase_b(
+            args.run_dir,
+            args.manifest,
+            args.output or OUTPUT_ROOT / "phase-b" / "exact-step-40.json",
+        )
     summary = result.get("summary", result)
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
     if summary.get("passed") is False:
