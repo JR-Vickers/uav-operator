@@ -233,6 +233,12 @@ approved after refreshed pricing projected `$1.4413`. The exact manual protocol 
 each requires refreshed live gates and separate approval after its predecessor
 capture passes.
 
+**Phase A review (2026-07-20; FAILED GATE).** Run
+`r6n3cud398dkrhnsoqwxpsjk` completed steps 20-30. An exact step-30 adapter
+evaluation was safety-clean and error-free, but T2 and T3 each maxed out in
+4/6 episodes, exceeding the 50% truncation gate. Phase B is withheld. Phase A
+cost `$1.4739461` including the clean validation, within its `$1.50` ceiling.
+
 ### Historical blocked-mode parallel plan (Day 8 is now unblocked)
 
 Day 8 blocks the project's training evidence, not the completed environment.

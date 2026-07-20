@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "uav_operator_main_training_phase_review",
+  "phase": "A",
+  "status": "FAILED_GATE",
+  "training_run_id": "r6n3cud398dkrhnsoqwxpsjk",
+  "input_checkpoint_id": "g1akido7qfo58e3my36wnqrz",
+  "input_global_step": 20,
+  "output_global_step": 30,
+  "output_adapter_id": "npn2nu01kpb3u402x1igr86v",
+  "model": "Qwen/Qwen3.5-2B",
+  "training_cost_usd": 1.1958,
+  "exact_checkpoint_evaluation_cost_usd": 0.2781461,
+  "phase_total_cost_usd": 1.4739461,
+  "phase_hard_ceiling_usd": 1.5,
+  "budget_passed": true,
+  "evaluation_protocol": {"dataset_split": "dev", "examples_per_tier": 6, "rollouts_per_example": 1, "temperature": 0, "max_tokens": 1024, "max_turns": 20, "retries": 0, "thinking": false, "saved_state_columns": ["sim_state", "sim_log"]},
+  "tiers": {
+    "T0": {"eval_run_id": "bf9336a4", "mean_reward": 0.9666666666666667, "hard_safety_violations": 0, "provider_errors": 0, "max_turn_truncations": 0, "episodes": 6, "cost_usd": 0.0156818, "passed": true},
+    "T1": {"eval_run_id": "da9639ed", "mean_reward": 0.3234647249330184, "hard_safety_violations": 0, "provider_errors": 0, "max_turn_truncations": 2, "episodes": 6, "cost_usd": 0.059292, "passed": true},
+    "T2": {"eval_run_id": "03199cc2", "mean_reward": -0.2137528469853387, "hard_safety_violations": 0, "provider_errors": 0, "max_turn_truncations": 4, "episodes": 6, "cost_usd": 0.102622, "passed": false},
+    "T3": {"eval_run_id": "fb5ff505", "mean_reward": -0.012521656348932755, "hard_safety_violations": 0, "provider_errors": 0, "max_turn_truncations": 4, "episodes": 6, "cost_usd": 0.1005503, "passed": false}
+  },
+  "failures": ["T2 max-turn truncation is 4/6 (66.7%), above the 50% gate", "T3 max-turn truncation is 4/6 (66.7%), above the 50% gate"],
+  "training_diagnostics": {"hard_safety_violations": 1, "note": "One stochastic exploratory training rollout at global step 23 received the simulator-derived hard-safety penalty. This is retained as diagnostic evidence; deterministic exact-checkpoint evaluation safety is the phase blocker."},
+  "evidence_note": "Hosted step-30 scheduled evaluations mixed policy versions 29 and 30. These tier results were rerun against the deployed exact step-30 adapter and are the gating evidence. Four earlier eval attempts failed before token usage because of an invalid sampling request and are excluded.",
+  "next_phase_authorized": false
+}

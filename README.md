@@ -190,9 +190,10 @@ The next cycle is prepared as three separately approved, warm-started phases:
 10 T1 updates, 20 mixed T1/T2 updates, then 20 mixed T1/T2/T3 updates. The
 [manual main-training protocol](docs/MAIN_TRAINING.md) freezes the curriculum,
 `$15` fail-closed ledger, provenance chain, stop rules, evidence locations, and
-post-training selection. Phase A has a user-approved `$1.50` ceiling after a
-live `$1.4413` projection. Preparation tooling is committed; no main phase has
-been launched.
+post-training selection. Phase A completed for `$1.4739` including exact
+checkpoint validation, but failed the truncation gate on T2 and T3; Phase B is
+withheld pending a remediation decision. See the
+[Phase A review](assets/training/main_phase_a_exact_step30.json).
 
 ## Documentation
 

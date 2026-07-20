@@ -1,5 +1,19 @@
 # HANDOFF.md
 
+## 2026-07-20 Phase A exact-checkpoint review
+
+- Phase A run `r6n3cud398dkrhnsoqwxpsjk` completed global steps 20-30 from
+  checkpoint `g1akido7qfo58e3my36wnqrz`; exact step-30 adapter is
+  `npn2nu01kpb3u402x1igr86v`.
+- Exact-adapter deterministic dev evaluation: T0 `0.9667` (0/6 max-turn), T1
+  `0.3235` (2/6), T2 `-0.2138` (4/6), T3 `-0.0125` (4/6). All 24 rows have
+  zero provider errors, zero hard-safety penalties, and saved sim state/logs.
+- Phase A is `FAILED_GATE`: T2 and T3 exceed the 50% max-turn cutoff. Do not
+  prepare or launch Phase B without an explicit remediation decision.
+- Cost: `$1.1958` training + `$0.2781461` exact evaluation = `$1.4739461`,
+  below the `$1.50` Phase A ceiling. Evidence is
+  `assets/training/main_phase_a_exact_step30.json`.
+
 ## 2026-07-20 Phase A launched
 
 - User explicitly confirmed the corrected global-step launch. Hosted Training

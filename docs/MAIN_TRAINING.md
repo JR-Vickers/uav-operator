@@ -120,6 +120,24 @@ After a passing capture, report actual phase and cumulative cost, reward by
 tier, safety events, truncation by milestone, exact final checkpoint identity,
 and the next `prepare` command before requesting approval.
 
+Exploratory training rollouts remain diagnostic evidence, including any
+simulator-derived safety penalty. The launch safety gate is evaluated on the
+deterministic exact-checkpoint dev workload. Hosted milestone evaluations that
+mix policy versions are not accepted as exact-checkpoint evidence.
+
+## Phase A result (2026-07-20)
+
+Run `r6n3cud398dkrhnsoqwxpsjk` completed global steps 20 through 30 and produced
+exact step-30 adapter `npn2nu01kpb3u402x1igr86v`. Training cost `$1.1958`; the
+clean exact-adapter T0-T3 validation cost `$0.2781461`; total Phase A cost
+`$1.4739461`, below the `$1.50` ceiling.
+
+The capture failed the preregistered truncation gate. T2 and T3 each reached
+the 20-turn limit in 4/6 episodes (66.7%). T0 and T1 had 0/6 and 2/6 max-turn
+stops. All 24 evaluations completed with saved simulator state/logs, zero
+provider errors, and zero hard-safety penalties. Phase B is withheld. See
+`assets/training/main_phase_a_exact_step30.json`.
+
 ## Post-Phase-C selection
 
 Deploy the smoke-step-20 and Phase-A/B/C checkpoints. Evaluate all four on
