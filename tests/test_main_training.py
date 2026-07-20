@@ -429,13 +429,13 @@ def test_capture_rejects_non_finite_metric() -> None:
 
 
 def test_budget_ledger_and_billing_reconciliation_failures(tmp_path: Path) -> None:
-    assert main.budget([])["projected_total_usd"] == pytest.approx(11.5469)
-    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(12.7969)
+    assert main.budget([])["projected_total_usd"] == pytest.approx(12.0969)
+    assert main.budget([])["hard_ceiling_total_usd"] == pytest.approx(13.0469)
     assert main.budget([])["unallocated_after_hard_ceilings_usd"] == pytest.approx(
-        2.2031
+        1.9531
     )
     capture = tmp_path / "a.json"
-    _write(capture, {"phase": "A", "summary": {"passed": True, "run_cost_usd": 1.26}})
+    _write(capture, {"phase": "A", "summary": {"passed": True, "run_cost_usd": 1.51}})
     with pytest.raises(ValueError, match="ceiling breached"):
         main.budget([capture])
     with pytest.raises(ValueError, match="unavailable"):

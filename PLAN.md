@@ -219,10 +219,11 @@ checkpoint/adapter milestones, and requires a passing captured predecessor
 before its successor can be prepared.
 
 The aggregate paid cap is now `$15.00`: `$3.0469` is already spent; Phase
-A/B/C hard ceilings are `$1.25`, `$2.35`, and `$2.40`; `$1.75`, `$0.75`, and
+A/B/C hard ceilings are `$1.50`, `$2.35`, and `$2.40`; `$1.75`, `$0.75`, and
 `$1.25` remain reserved for final candidate comparison, trained-model
-red-team, and frozen evaluation. Hard ceilings total `$12.7969`, leaving
-`$2.2031` unallocated. The exact manual protocol and stop rules are frozen in
+red-team, and frozen evaluation. Hard ceilings total `$13.0469`, leaving
+`$1.9531` unallocated. The Phase-A increase from `$1.25` was explicitly
+approved after refreshed pricing projected `$1.4413`. The exact manual protocol and stop rules are frozen in
 `docs/MAIN_TRAINING.md`. No phase launch is authorized by this preparation;
 each requires refreshed live gates and separate approval after its predecessor
 capture passes.

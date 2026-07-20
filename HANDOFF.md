@@ -25,9 +25,12 @@ Next action:
 - Live Phase-A preparation was attempted after the green suite. Qwen remained
   available, but its effective inference-input price is now `$0.05/M`; scaling
   the smoke's measured token profile projects Phase A at about `$1.4413`, over
-  its `$1.25` hard ceiling. The command correctly failed before writing a
-  launch bundle. Revisit workload sizing or obtain explicit budget direction;
-  do not consume the `$2.2031` aggregate reserve silently and do not launch.
+  its original `$1.25` hard ceiling. The user subsequently approved a narrow
+  Phase-A increase to `$1.50`. Refreshed preparation now passes at `$1.4413`;
+  the ignored bundle is under `outputs/main-training/phase-a/`, with config
+  SHA-256 `030d809a9392be4da0a5c7d2dc2a14b762c9a539ef3b9b9c9a4cd6a1b65dcf8d`.
+  Present its exact command and obtain final launch approval. Do not infer
+  launch authorization from the budget change alone.
 
 ## 2026-07-20 checkpoint 20 selected on frozen T1 dev evidence
 

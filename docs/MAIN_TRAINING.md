@@ -34,24 +34,24 @@ Simulator, reward, prompt, generator, and split semantics remain frozen.
 | Item | Expected | Hard ceiling |
 |---|---:|---:|
 | Existing diagnostic, smoke, and checkpoint comparison | $3.0469 | $3.0469 |
-| Phase A | $0.90 | $1.25 |
+| Phase A | $1.45 | $1.50 |
 | Phase B | $1.90 | $2.35 |
 | Phase C | $1.95 | $2.40 |
 | Post-training dev comparison | reserved | $1.75 |
 | T2/T3 red-team | reserved | $0.75 |
 | Frozen final evaluation | reserved | $1.25 |
 
-Expected total is `$11.5469`; the sum of all hard ceilings is `$12.7969`,
-leaving `$2.2031` below the aggregate `$15.00` cap. A pricing change recomputes
+Expected total is `$12.0969`; the sum of all hard ceilings is `$13.0469`,
+leaving `$1.9531` below the aggregate `$15.00` cap. A pricing change recomputes
 the phase projection from the paid smoke's measured tokens. It cannot silently
 consume the unallocated amount. Missing pricing, capacity, wallet, Hub status,
 or billing evidence fails closed.
 
 On 2026-07-20 the first live Phase-A preparation stopped at this gate: the
 effective inference-input price was `$0.05/M`, producing a conservative
-`$1.4413` projection against the `$1.25` ceiling. No launch bundle or paid run
-was created. Workload sizing or an explicit budget decision is required before
-preparation can pass.
+`$1.4413` projection against the original `$1.25` ceiling. The user then
+approved a narrow increase to `$1.50`, leaving the `$15.00` aggregate cap and
+all downstream reserves unchanged.
 
 ## Manual commands and evidence
 
